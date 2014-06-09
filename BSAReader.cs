@@ -52,7 +52,7 @@ namespace BSAsharp
             var totalFileNameLength = _reader.ReadUInt32();
             var fileFlags = (FileFlags)_reader.ReadUInt32();
 
-            var folderDict = new Dictionary<string, List<FileRecord>>();
+            var folderDict = new Dictionary<string, Tuple<FolderRecord, List<FileRecord>>>();
 
             var folders = ReadFolderRecord(folderCount);
             foreach (var folder in folders)
@@ -60,10 +60,11 @@ namespace BSAsharp
                 string name;
                 var frbs = ReadFileRecordBlocks(folder.count, out name);
 
-                folderDict.Add(name, frbs);
+                folderDict.Add(name, Tuple.Create(folder, frbs));
             }
 
             BSAFile.DefaultCompressed = archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            BSAFile.BStringPrefixed = archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
 
             var fileNames = ReadFileNameBlocks(fileCount);
             var fileNameDict = fileNames.ToDictionary(s => CreateHash(Path.GetFileNameWithoutExtension(s), Path.GetExtension(s)), s => s);
@@ -71,15 +72,18 @@ namespace BSAsharp
             var bsaFolders =
                 from kvp in folderDict
                 let path = kvp.Key
-                let files = kvp.Value
-                select new BSAFolder(path, files.Select(fr => new BSAFile(fileNameDict[fr.hash], fr, _reader)));
+                let folderRec = kvp.Value.Item1
+                let fileRecs = kvp.Value.Item2
+                select new BSAFolder(path, fileRecs.Select(fr => new BSAFile(fileNameDict[fr.hash], fr, _reader)));
 
             //Trace.Assert(matches.SequenceEqual(folderDict.Values.SelectMany(s => s)));
             foreach (var folder in bsaFolders)
             {
                 foreach (var child in folder.Children)
                 {
+                    Console.WriteLine(child.Name);
                     Console.WriteLine(child.IsCompressed);
+                    Console.WriteLine();
                 }
             }
             Console.ReadKey();

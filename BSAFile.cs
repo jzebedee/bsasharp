@@ -4,6 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
+using ICSharpCode.SharpZipLib;
+using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
+using ICSharpCode.SharpZipLib.Zip.Compression;
 
 namespace BSAsharp
 {
@@ -12,11 +16,11 @@ namespace BSAsharp
         const uint FLAG_COMPRESS = 1 << 30;
 
         public static bool DefaultCompressed { get; set; }
+        public static bool BStringPrefixed { get; set; }
 
         public string Name { get; private set; }
         public bool IsCompressed { get; private set; }
-
-        private byte[] data;
+        public byte[] Data { get; private set; }
 
         public BSAFile(string name, FileRecord baseRec, BinaryReader reader, bool resetStream = false)
         {
@@ -29,12 +33,48 @@ namespace BSAsharp
             try
             {
                 reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
-                data = reader.ReadBytes((int)baseRec.size);
+                ReadFileBlock(reader, baseRec.size);
             }
             finally
             {
                 if (resetStream)
                     reader.BaseStream.Seek(streamPos, SeekOrigin.Begin);
+            }
+        }
+
+        private void ReadFileBlock(BinaryReader reader, uint size)
+        {
+            if (BStringPrefixed)
+            {
+                var name = reader.ReadBString();
+            }
+
+            if (IsCompressed)
+            {
+                var originalSize = reader.ReadUInt32();
+                var compressedData = reader.ReadBytes((int)size + (int)originalSize);
+
+                var decompressedData = ZlibDecompress(compressedData);
+
+                Trace.Assert(decompressedData.Length == originalSize);
+                this.Data = decompressedData;
+            }
+            else
+            {
+                this.Data = reader.ReadBytes((int)size);
+            }
+        }
+
+        private byte[] ZlibDecompress(byte[] inBuf)
+        {
+            using (MemoryStream msCompressed = new MemoryStream(inBuf), msDecompressed = new MemoryStream())
+            {
+                using (var zlStream = new InflaterInputStream(msCompressed))
+                {
+                    zlStream.CopyTo(msDecompressed);
+                }
+
+                return msDecompressed.ToArray();
             }
         }
     }

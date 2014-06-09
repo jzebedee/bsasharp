@@ -17,7 +17,7 @@ namespace BSAsharp.Format
         //0x40
         //0x80
         unk3 = 0x100,
-        unk4 = 0x200,
+        BStringPrefixed = 0x200,
         unk5 = 0x400,
         unk6 = 0x800
     }

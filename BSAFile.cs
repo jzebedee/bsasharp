@@ -52,7 +52,7 @@ namespace BSAsharp
             if (IsCompressed)
             {
                 var originalSize = reader.ReadUInt32();
-                var compressedData = reader.ReadBytes((int)size + (int)originalSize);
+                var compressedData = reader.ReadBytes(sizeof(uint) + (int)size);
 
                 var decompressedData = ZlibDecompress(compressedData);
 

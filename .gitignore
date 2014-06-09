@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/bin/Debug
+/BSAsharp-debug/bin/Debug
+/obj/Debug
+/BSAsharp-debug/obj/Debug
+*.suo

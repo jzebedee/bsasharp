@@ -5,9 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Diagnostics;
-using ICSharpCode.SharpZipLib;
-using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
-using ICSharpCode.SharpZipLib.Zip.Compression;
+using System.Runtime.InteropServices;
+using System.IO.Compression;
 
 namespace BSAsharp
 {
@@ -52,9 +51,8 @@ namespace BSAsharp
             if (IsCompressed)
             {
                 var originalSize = reader.ReadUInt32();
-                var compressedData = reader.ReadBytes(sizeof(uint) + (int)size);
-
-                var decompressedData = ZlibDecompress(compressedData);
+                var compressedData = reader.ReadBytes((int)size);
+                var decompressedData = ZlibDecompress(compressedData, originalSize);
 
                 Trace.Assert(decompressedData.Length == originalSize);
                 this.Data = decompressedData;
@@ -65,14 +63,28 @@ namespace BSAsharp
             }
         }
 
-        private byte[] ZlibDecompress(byte[] inBuf)
+        private byte[] ZlibDecompress(byte[] inBuf, uint originalSize)
         {
-            using (MemoryStream msCompressed = new MemoryStream(inBuf), msDecompressed = new MemoryStream())
+            using (MemoryStream msDecompressed = new MemoryStream((int)originalSize))
             {
-                using (var zlStream = new InflaterInputStream(msCompressed))
+                var msCompressed = new MemoryStream(inBuf);
+                msCompressed.Seek(2, SeekOrigin.Begin);
+
+                using (var defStream = new DeflateStream(msCompressed, CompressionMode.Decompress))
                 {
-                    zlStream.CopyTo(msDecompressed);
+                    defStream.CopyTo(msDecompressed);
                 }
+                //using (var zlStream = new ZLibStream(msCompressed, CompressionMode.Decompress, true))
+                //{
+                //    //byte[] buf = new byte[0x1000];
+                //    //int bytesRead;
+                //    //while ((bytesRead = zlStream.Read(buf, 0, 0x1000)) > 0)
+                //    //    msDecompressed.Write(buf, 0, bytesRead);
+                //    //int zlB;
+                //    //while ((zlB = zlStream.ReadByte()) > 0)
+                //    //    msDecompressed.WriteByte((byte)zlB);
+                //    zlStream.CopyTo(msDecompressed);
+                //}
 
                 return msDecompressed.ToArray();
             }

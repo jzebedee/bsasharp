@@ -35,7 +35,7 @@ namespace BSAsharp
             GC.SuppressFinalize(this);
         }
 
-        public IEnumerable<BSAFolder> Read()
+        public List<BSAFolder> Read()
         {
             var header = ReadHeader();
             var folderDict = ReadFolders(header.folderCount);

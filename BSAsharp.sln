@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.30501.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp", "BSAsharp.csproj", "{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp-debug", "BSAsharp-debug\BSAsharp-debug.csproj", "{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

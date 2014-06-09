@@ -10,7 +10,7 @@ using System.IO.Compression;
 
 namespace BSAsharp
 {
-    class BSAFile
+    public class BSAFile
     {
         const uint FLAG_COMPRESS = 1 << 30;
 
@@ -21,12 +21,9 @@ namespace BSAsharp
         public bool IsCompressed { get; private set; }
         public byte[] Data { get; private set; }
 
-        private readonly FileRecord _rec;
-
-        public BSAFile(string name, FileRecord baseRec, BinaryReader reader, bool resetStream = false)
+        internal BSAFile(string name, FileRecord baseRec, BinaryReader reader, bool resetStream = false)
         {
             this.Name = name;
-            this._rec = baseRec;
 
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
             this.IsCompressed = DefaultCompressed ^ compressBitSet;
@@ -42,11 +39,6 @@ namespace BSAsharp
                 if (resetStream)
                     reader.BaseStream.Seek(streamPos, SeekOrigin.Begin);
             }
-        }
-
-        public void CheckFile(Action<FileRecord, byte[]> fileFunction)
-        {
-            fileFunction(_rec, Data);
         }
 
         private void ReadFileBlock(BinaryReader reader, uint size)

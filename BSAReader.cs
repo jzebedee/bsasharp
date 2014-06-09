@@ -35,24 +35,41 @@ namespace BSAsharp
             GC.SuppressFinalize(this);
         }
 
-        public void Read()
+        public IEnumerable<BSAFolder> Read()
         {
-            ReadHeader();
+            var header = ReadHeader();
+            var folderDict = ReadFolders(header.folderCount);
+
+            BSAFile.DefaultCompressed = header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            BSAFile.BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+
+            var fileDict = ReadFiles(header.fileCount);
+
+            return BuildBSALayout(folderDict, fileDict);
         }
 
-        private void ReadHeader()
+        private BSAHeader ReadHeader()
         {
-            var field = _reader.ReadChars(4);
-            var version = _reader.ReadUInt32();
-            var offset = _reader.ReadUInt32();
-            var archiveFlags = (ArchiveFlags)_reader.ReadUInt32();
-            var folderCount = _reader.ReadUInt32();
-            var fileCount = _reader.ReadUInt32();
-            var totalFolderNameLength = _reader.ReadUInt32();
-            var totalFileNameLength = _reader.ReadUInt32();
-            var fileFlags = (FileFlags)_reader.ReadUInt32();
+            return _reader.ReadStruct<BSAHeader>();
+        }
 
-            var folderDict = new Dictionary<string, Tuple<FolderRecord, List<FileRecord>>>();
+        private IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, List<FileRecord>> folderDict, Dictionary<ulong, string> fileDict)
+        {
+            return from kvp in folderDict
+                   let path = kvp.Key
+                   let fileRecs = kvp.Value
+                   select new BSAFolder(path, fileRecs.Select(fr => new BSAFile(fileDict[fr.hash], fr, _reader)));
+        }
+
+        private Dictionary<ulong, string> ReadFiles(uint fileCount)
+        {
+            var fileNames = ReadFileNameBlocks(fileCount);
+            return fileNames.ToDictionary(s => CreateHash(Path.GetFileNameWithoutExtension(s), Path.GetExtension(s)), s => s);
+        }
+
+        private Dictionary<string, List<FileRecord>> ReadFolders(uint folderCount)
+        {
+            var folderDict = new Dictionary<string, List<FileRecord>>();
 
             var folders = ReadFolderRecord(folderCount);
             foreach (var folder in folders)
@@ -60,38 +77,16 @@ namespace BSAsharp
                 string name;
                 var frbs = ReadFileRecordBlocks(folder.count, out name);
 
-                folderDict.Add(name, Tuple.Create(folder, frbs));
+                folderDict.Add(name, frbs);
             }
 
-            BSAFile.DefaultCompressed = archiveFlags.HasFlag(ArchiveFlags.Compressed);
-            BSAFile.BStringPrefixed = archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-
-            var fileNames = ReadFileNameBlocks(fileCount);
-            var fileNameDict = fileNames.ToDictionary(s => CreateHash(Path.GetFileNameWithoutExtension(s), Path.GetExtension(s)), s => s);
-
-            var bsaFolders =
-                from kvp in folderDict
-                let path = kvp.Key
-                let folderRec = kvp.Value.Item1
-                let fileRecs = kvp.Value.Item2
-                select new BSAFolder(path, fileRecs.Select(fr => new BSAFile(fileNameDict[fr.hash], fr, _reader)));
-
-            //Trace.Assert(matches.SequenceEqual(folderDict.Values.SelectMany(s => s)));
-            foreach (var folder in bsaFolders)
-            {
-                foreach (var child in folder.Children)
-                {
-                    Console.WriteLine(child.Name);
-                    Console.WriteLine(child.IsCompressed);
-                    Console.WriteLine();
-                }
-            }
-            Console.ReadKey();
+            return folderDict;
         }
 
         private List<FolderRecord> ReadFolderRecord(uint count)
         {
             var folders = new List<FolderRecord>((int)count);
+
             for (uint i = 0; i < count; i++)
                 folders.Add(_reader.ReadStruct<FolderRecord>());
 
@@ -112,13 +107,14 @@ namespace BSAsharp
         private List<string> ReadFileNameBlocks(uint count)
         {
             var fileNames = new List<string>();
+
             for (int i = 0; i < count; i++)
                 fileNames.Add(_reader.ReadCString());
 
             return fileNames;
         }
 
-        private ulong CreateHash(string file, string ext)
+        private static ulong CreateHash(string file, string ext)
         {
             Trace.Assert(file.Length > 0);
             ulong hash1 = (ulong)(file[file.Length - 1] | ((file.Length > 2 ? file[file.Length - 2] : 0) << 8) | file.Length << 16 | file[0] << 24);

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace BSAsharp
 {
-    class BSAFolder
+    public class BSAFolder
     {
         public string Path { get; private set; }
         public IEnumerable<BSAFile> Children { get; private set; }

@@ -63,15 +63,26 @@ namespace BSAsharp
                 folderDict.Add(name, frbs);
             }
 
-            //archiveFlags.HasFlag(ArchiveFlags.Compressed)
+            BSAFile.DefaultCompressed = archiveFlags.HasFlag(ArchiveFlags.Compressed);
+
             var fileNames = ReadFileNameBlocks(fileCount);
-            foreach (var fn in fileNames)
+            var fileNameDict = fileNames.ToDictionary(s => CreateHash(Path.GetFileNameWithoutExtension(s), Path.GetExtension(s)), s => s);
+
+            var bsaFolders =
+                from kvp in folderDict
+                let path = kvp.Key
+                let files = kvp.Value
+                select new BSAFolder(path, files.Select(fr => new BSAFile(fileNameDict[fr.hash], fr, _reader)));
+
+            //Trace.Assert(matches.SequenceEqual(folderDict.Values.SelectMany(s => s)));
+            foreach (var folder in bsaFolders)
             {
-                //var hash = CreateHash(Path.Combine(folderDict.Keys.First(), Path.GetFileNameWithoutExtension(fn)), Path.GetExtension(fn));
-                var hash = CreateHash(Path.GetFileNameWithoutExtension(fn), Path.GetExtension(fn));
-                var match = folderDict.SelectMany(kvp => kvp.Value.Where(fr => fr.hash == hash)).FirstOrDefault();
-                Console.WriteLine(hash);
+                foreach (var child in folder.Children)
+                {
+                    Console.WriteLine(child.IsCompressed);
+                }
             }
+            Console.ReadKey();
         }
 
         private List<FolderRecord> ReadFolderRecord(uint count)

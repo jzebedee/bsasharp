@@ -40,6 +40,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BSAFile.cs" />
+    <Compile Include="BSAFolder.cs" />
     <Compile Include="BSAReader.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Format\ArchiveFlags.cs" />

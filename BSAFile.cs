@@ -21,9 +21,12 @@ namespace BSAsharp
         public bool IsCompressed { get; private set; }
         public byte[] Data { get; private set; }
 
+        private readonly FileRecord _rec;
+
         public BSAFile(string name, FileRecord baseRec, BinaryReader reader, bool resetStream = false)
         {
             this.Name = name;
+            this._rec = baseRec;
 
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
             this.IsCompressed = DefaultCompressed ^ compressBitSet;
@@ -39,6 +42,11 @@ namespace BSAsharp
                 if (resetStream)
                     reader.BaseStream.Seek(streamPos, SeekOrigin.Begin);
             }
+        }
+
+        public void CheckFile(Action<FileRecord, byte[]> fileFunction)
+        {
+            fileFunction(_rec, Data);
         }
 
         private void ReadFileBlock(BinaryReader reader, uint size)
@@ -74,17 +82,6 @@ namespace BSAsharp
                 {
                     defStream.CopyTo(msDecompressed);
                 }
-                //using (var zlStream = new ZLibStream(msCompressed, CompressionMode.Decompress, true))
-                //{
-                //    //byte[] buf = new byte[0x1000];
-                //    //int bytesRead;
-                //    //while ((bytesRead = zlStream.Read(buf, 0, 0x1000)) > 0)
-                //    //    msDecompressed.Write(buf, 0, bytesRead);
-                //    //int zlB;
-                //    //while ((zlB = zlStream.ReadByte()) > 0)
-                //    //    msDecompressed.WriteByte((byte)zlB);
-                //    zlStream.CopyTo(msDecompressed);
-                //}
 
                 return msDecompressed.ToArray();
             }

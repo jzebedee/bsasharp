@@ -43,9 +43,9 @@ namespace BSAsharp
             BSAFile.DefaultCompressed = header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
             BSAFile.BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
 
-            var fileDict = ReadFiles(header.fileCount);
+            var fileNames = ReadFilenames(header.fileCount);
 
-            return BuildBSALayout(folderDict, fileDict);
+            return BuildBSALayout(folderDict, fileNames);
         }
 
         private BSAHeader ReadHeader()
@@ -53,18 +53,20 @@ namespace BSAsharp
             return _reader.ReadStruct<BSAHeader>();
         }
 
-        private IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, List<FileRecord>> folderDict, Dictionary<ulong, string> fileDict)
+        private List<BSAFolder> BuildBSALayout(Dictionary<string, List<FileRecord>> folderDict, List<string> fileNames)
         {
-            return from kvp in folderDict
+            int i = 0;
+            return (from kvp in folderDict
                    let path = kvp.Key
                    let fileRecs = kvp.Value
-                   select new BSAFolder(path, fileRecs.Select(fr => new BSAFile(fileDict[fr.hash], fr, _reader)));
+                   select new BSAFolder(path, fileRecs.Select(fr => new BSAFile(path, fileNames[i++], fr, _reader)))).ToList();
         }
 
-        private Dictionary<ulong, string> ReadFiles(uint fileCount)
+        private List<string> ReadFilenames(uint fileCount)
         {
-            var fileNames = ReadFileNameBlocks(fileCount);
-            return fileNames.ToDictionary(s => CreateHash(Path.GetFileNameWithoutExtension(s), Path.GetExtension(s)), s => s);
+            return (from fileName in ReadFileNameBlocks(fileCount)
+                    //let hash = CreateHash(Path.GetFileNameWithoutExtension(fileName), Path.GetExtension(fileName))
+                    select fileName).ToList();
         }
 
         private Dictionary<string, List<FileRecord>> ReadFolders(uint folderCount)
@@ -99,7 +101,10 @@ namespace BSAsharp
 
             name = _reader.ReadBString(true);
             for (uint i = 0; i < count; i++)
-                fileRecords.Add(_reader.ReadStruct<FileRecord>());
+            {
+                var record = _reader.ReadStruct<FileRecord>();
+                fileRecords.Add(record);
+            }
 
             return fileRecords;
         }
@@ -114,10 +119,10 @@ namespace BSAsharp
             return fileNames;
         }
 
-        private static ulong CreateHash(string file, string ext)
+        private static ulong CreateHash(string fname, string ext)
         {
-            Trace.Assert(file.Length > 0);
-            ulong hash1 = (ulong)(file[file.Length - 1] | ((file.Length > 2 ? file[file.Length - 2] : 0) << 8) | file.Length << 16 | file[0] << 24);
+            Trace.Assert(fname.Length > 0);
+            ulong hash1 = (ulong)(fname[fname.Length - 1] | ((fname.Length > 2 ? fname[fname.Length - 2] : 0) << 8) | fname.Length << 16 | fname[0] << 24);
 
             Trace.Assert(ext.Length > 0);
             switch (ext)
@@ -137,9 +142,9 @@ namespace BSAsharp
             }
 
             ulong hash2 = 0, hash3 = 0;
-            if (file.Length > 3)
-                for (int i = 1; i < file.Length - 2; i++)
-                    hash2 = (hash2 * 0x1003F) + file[i];
+            if (fname.Length > 3)
+                for (int i = 1; i < fname.Length - 2; i++)
+                    hash2 = (hash2 * 0x1003F) + fname[i];
 
             for (int i = 0; i < ext.Length; i++)
                 hash3 = (hash3 * 0x1003F) + ext[i];

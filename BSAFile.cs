@@ -18,12 +18,14 @@ namespace BSAsharp
         public static bool BStringPrefixed { get; set; }
 
         public string Name { get; private set; }
+        public string Filename { get; private set; }
         public bool IsCompressed { get; private set; }
         public byte[] Data { get; private set; }
 
-        internal BSAFile(string name, FileRecord baseRec, BinaryReader reader, bool resetStream = false)
+        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool resetStream = false)
         {
             this.Name = name;
+            this.Filename = Path.Combine(path, name);
 
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
             this.IsCompressed = DefaultCompressed ^ compressBitSet;

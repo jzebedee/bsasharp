@@ -11,7 +11,15 @@ namespace BSAsharp_debug
     {
         static void Main(string[] args)
         {
-            using (var fs = File.OpenRead(@"X:\Games\Fallout3\Data\Fallout - Misc.bsa"))
+            if (args.Length == 0)
+            {
+                Console.WriteLine("Use:");
+                Console.WriteLine("bsasharp-debug <bsa path>");
+                Console.ReadKey();
+                return;
+            }
+
+            using (var fs = File.OpenRead(args[0]))
             {
                 var bsaReader = new BSAsharp.BSAReader(fs);
                 var layout = bsaReader.Read();

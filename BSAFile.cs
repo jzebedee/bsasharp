@@ -55,7 +55,7 @@ namespace BSAsharp
 
             if (size == 0 || (size <= 4 && IsCompressed))
             {
-                this.Data = new byte[size];
+                this.Data = new byte[0];
                 return;
             }
 

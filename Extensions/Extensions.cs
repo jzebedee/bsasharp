@@ -5,11 +5,11 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace BSAsharp
+namespace BSAsharp.Extensions
 {
     public static class Extensions
     {
-        static readonly Encoding Windows1252 = Encoding.GetEncoding("Windows-1252");
+        public static readonly Encoding Windows1252 = Encoding.GetEncoding("Windows-1252");
 
         public static T ReadStruct<T>(this BinaryReader reader, int? Size = null)// where T : struct
         {
@@ -30,6 +30,14 @@ namespace BSAsharp
             return stripEnd ? bstring.TrimEnd('\0') : bstring;
         }
 
+        public static void WriteBString(this BinaryWriter writer, string toWrite)
+        {
+            var bytes = Windows1252.GetBytes(toWrite + '\0');
+
+            writer.Write((byte)bytes.Length);
+            writer.Write(bytes);
+        }
+
         public static string ReadCString(this BinaryReader reader)
         {
             var builder = new StringBuilder();
@@ -38,6 +46,12 @@ namespace BSAsharp
             while ((cur = reader.ReadByte()) != '\0') builder.Append((char)cur);
 
             return builder.ToString();
+        }
+
+        public static void WriteCString(this BinaryWriter writer, string toWrite)
+        {
+            var bytes = Windows1252.GetBytes(toWrite + '\0');
+            writer.Write(bytes);
         }
 
         //public static async Task<T> ReadStructAsync<T>(this BinaryReader reader, int? Size = null) where T : struct

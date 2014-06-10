@@ -9,15 +9,16 @@ using System.Runtime.InteropServices;
 
 namespace BSAsharp
 {
-    public class MemoryMappedBSAReader : BSAReader
+    internal class MemoryMappedBSAReader : BSAReader
     {
-        const long TWO_GB_LIMIT = 2147483648; //2^31
+        public const long TWO_GB_SIZE = 2147483648; //2^31
 
         private readonly MemoryMappedFile _mmf;
         private BSAHeader _header;
 
         private long _offset = 0;
-        private long _size;
+
+        public string MemoryMapName { get; private set; }
 
         /// <summary>
         /// Initializes a memory-mapped reader for a BSA
@@ -26,11 +27,15 @@ namespace BSAsharp
         /// <param name="size">The size of the BSA in bytes</param>
         public MemoryMappedBSAReader(string bsaPath, long size)
         {
-            if (size > TWO_GB_LIMIT)
+            if (size > TWO_GB_SIZE)
                 throw new ArgumentException("BSA cannot be greater than 2GiB");
 
-            this._size = size;
-            this._mmf = MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, Path.GetFileName(Path.GetTempFileName()), size, MemoryMappedFileAccess.Read);
+            this._mmf = MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, (MemoryMapName = Path.GetFileName(Path.GetTempFileName())), size, MemoryMappedFileAccess.ReadWrite);
+        }
+
+        public MemoryMappedBSAReader(MemoryMappedFile mmf)
+        {
+            this._mmf = mmf;//MemoryMappedFile.CreateOrOpen((MemoryMapName = memoryMappedBSA), TWO_GB_SIZE, MemoryMappedFileAccess.ReadWrite);
         }
 
         protected override void Dispose(bool disposing)
@@ -66,6 +71,12 @@ namespace BSAsharp
         private BinaryReader ReaderFromMMF<T>(uint count, long offset = -1)
         {
             return new BinaryReader(FromMMF<T>(offset < 0 ? _offset : offset, count));
+        }
+
+        public override IEnumerable<BSAFolder> Read()
+        {
+            _offset = 0;
+            return base.Read();
         }
 
         protected override IEnumerable<BSAFolder> BuildBSALayout(List<KeyValuePair<string, FileRecord>> kvpList, List<string> fileNames)

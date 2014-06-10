@@ -20,20 +20,18 @@ namespace BSAsharp_debug
                 return;
             }
 
-            //using (var fs = File.OpenRead(args[0]))
+            using (var wrapper = new BSAsharp.BSAWrapper(@"test.bsa"))
+            //using (var wrapper = new BSAsharp.BSAWrapper(args[0]))
             {
-                var fileInfo = new FileInfo(args[0]);
-
-                var bsaReader = new BSAsharp.MemoryMappedBSAReader(fileInfo.FullName, fileInfo.Length);
-                //var bsaReader = new BSAsharp.BSAReader(fs);
-                var layout = bsaReader.Read();
+                Console.WriteLine(wrapper.ToList());
+                wrapper.Save();
 
                 var extractWatch = new Stopwatch();
                 try
                 {
                     extractWatch.Start();
 
-                    foreach (var folder in layout)
+                    foreach (var folder in wrapper)
                     {
                         //Console.WriteLine(folder.Path);
                         foreach (var child in folder.Children)

@@ -27,6 +27,15 @@ namespace BSAsharp
 
         private readonly bool LeaveOpen;
 
+        public BSAFile(string path, string name, byte[] data, bool compress = true)
+        {
+            this.Name = name.ToLowerInvariant();
+            this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
+
+            this.Data = data;
+            this.IsCompressed = compress;
+        }
+
         internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool preSeek = true, bool leaveOpen = true)
             : this(path, name, baseRec)
         {
@@ -35,13 +44,14 @@ namespace BSAsharp
                 reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
             ReadFileBlock(reader, baseRec.size);
         }
-
-        private BSAFile(string path, string name, FileRecord baseRec)
+        internal BSAFile(string path, string name, FileRecord baseRec)
         {
-            this.Name = name;
-            this.Filename = Path.Combine(path, name);
+            this.Name = name.ToLowerInvariant();
+            this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
 
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
+            if (compressBitSet)
+                baseRec.size ^= FLAG_COMPRESS;
             this.IsCompressed = DefaultCompressed ^ compressBitSet;
         }
 
@@ -92,5 +102,19 @@ namespace BSAsharp
                 return msDecompressed.ToArray();
             }
         }
+
+        //private byte[] ZlibCompress(byte[], uint originalSize)
+        //{
+        //    using (MemoryStream msDecompressed = new MemoryStream((int)originalSize))
+        //    {
+        //        //DeflateStream closes the underlying stream when disposed
+        //        using (var defStream = new DeflateStream(compressedStream, CompressionMode.Decompress, LeaveOpen))
+        //        {
+        //            defStream.CopyTo(msDecompressed);
+        //        }
+
+        //        return msDecompressed.ToArray();
+        //    }
+        //}
     }
 }

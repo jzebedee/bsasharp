@@ -46,7 +46,9 @@
     <Compile Include="BSAFile.cs" />
     <Compile Include="BSAFolder.cs" />
     <Compile Include="BSAReader.cs" />
-    <Compile Include="Extensions.cs" />
+    <Compile Include="BSAWrapper.cs" />
+    <Compile Include="Extensions\Extensions.cs" />
+    <Compile Include="Extensions\Util.cs" />
     <Compile Include="Format\ArchiveFlags.cs" />
     <Compile Include="Format\BSAHeader.cs" />
     <Compile Include="Format\FileFlags.cs" />

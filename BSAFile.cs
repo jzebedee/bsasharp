@@ -25,16 +25,15 @@ namespace BSAsharp
         public bool IsCompressed { get; private set; }
         public byte[] Data { get; private set; }
 
-        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader)
+        private readonly bool LeaveOpen;
+
+        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool preSeek = true, bool leaveOpen = true)
             : this(path, name, baseRec)
         {
-            reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
+            this.LeaveOpen = leaveOpen;
+            if (preSeek)
+                reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
             ReadFileBlock(reader, baseRec.size);
-        }
-        internal BSAFile(string path, string name, FileRecord baseRec, UnmanagedMemoryAccessor accessor)
-            : this(path, name, baseRec)
-        {
-            ReadFileBlock(accessor, baseRec.size);
         }
 
         private BSAFile(string path, string name, FileRecord baseRec)
@@ -65,8 +64,10 @@ namespace BSAsharp
                 var originalSize = reader.ReadUInt32();
                 size -= sizeof(uint);
 
-                var compressedData = reader.ReadBytes((int)size);
-                var decompressedData = ZlibDecompress(compressedData, originalSize);
+                //Skips zlib descriptors
+                reader.BaseStream.Seek(2, SeekOrigin.Current);
+
+                var decompressedData = ZlibDecompress(reader.BaseStream, originalSize);
 
                 Trace.Assert(decompressedData.Length == originalSize);
                 this.Data = decompressedData;
@@ -74,59 +75,16 @@ namespace BSAsharp
             else
             {
                 this.Data = reader.ReadBytes((int)size);
+                Trace.Assert(this.Data.Length == size);
             }
         }
 
-        private void ReadFileBlock(UnmanagedMemoryAccessor reader, uint size)
-        {
-            using (reader)
-            {
-                if (BStringPrefixed)
-                {
-                    throw new NotImplementedException();
-                    //var name = reader.ReadBString();
-                }
-
-                if (size == 0 || (size <= 4 && IsCompressed))
-                {
-                    this.Data = new byte[size];
-                    return;
-                }
-
-                if (IsCompressed)
-                {
-                    var originalSize = reader.ReadUInt32(0);
-                    size -= sizeof(uint);
-
-                    byte[] compressedData = new byte[size];
-                    int bytesRead = reader.ReadArray<byte>(sizeof(uint), compressedData, 0, (int)size);
-                    Trace.Assert(bytesRead == size);
-
-                    var decompressedData = ZlibDecompress(compressedData, originalSize);
-
-                    Trace.Assert(decompressedData.Length == originalSize);
-                    this.Data = decompressedData;
-                }
-                else
-                {
-                    this.Data = new byte[size];
-                    int bytesRead = reader.ReadArray<byte>(0, this.Data, 0, (int)size);
-                    Trace.Assert(bytesRead == size);
-                }
-            }
-        }
-
-        private byte[] ZlibDecompress(byte[] inBuf, uint originalSize)
+        private byte[] ZlibDecompress(Stream compressedStream, uint originalSize)
         {
             using (MemoryStream msDecompressed = new MemoryStream((int)originalSize))
             {
-                var msCompressed = new MemoryStream(inBuf);
-
-                //Skips zlib descriptors
-                msCompressed.Seek(2, SeekOrigin.Begin);
-
                 //DeflateStream closes the underlying stream when disposed
-                using (var defStream = new DeflateStream(msCompressed, CompressionMode.Decompress))
+                using (var defStream = new DeflateStream(compressedStream, CompressionMode.Decompress, LeaveOpen))
                 {
                     defStream.CopyTo(msDecompressed);
                 }

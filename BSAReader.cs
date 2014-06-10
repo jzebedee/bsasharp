@@ -14,6 +14,11 @@ namespace BSAsharp
     {
         protected BinaryReader Reader { get; set; }
 
+        protected bool DefaultCompressed { get; private set; }
+        //private bool BStringPrefixed { get; set; }
+
+        public BSAHeader Header { get; protected set; }
+
         /// <summary>
         /// Initializes a standard I/O reader for a BSA
         /// </summary>
@@ -46,13 +51,14 @@ namespace BSAsharp
 
         public virtual IEnumerable<BSAFolder> Read()
         {
-            var header = ReadHeader();
-            var kvpList = ReadFolders(header.folderCount);
+            Header = ReadHeader();
+            var kvpList = ReadFolders(Header.folderCount);
 
-            BSAFile.DefaultCompressed = header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
-            BSAFile.BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            Trace.Assert(!Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed));
+            //BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
 
-            var fileNames = ReadFileNameBlocks(header.fileCount);
+            var fileNames = ReadFileNameBlocks(Header.fileCount);
 
             return BuildBSALayout(kvpList, fileNames);
         }
@@ -63,7 +69,7 @@ namespace BSAsharp
             var fileLookup = pathedFiles.ToLookup(tup => tup.Item1, tup => Tuple.Create(tup.Item2, tup.Item3));
             return
                 from g in fileLookup
-                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, Reader)));
+                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, Reader, DefaultCompressed)));
         }
 
         protected virtual BSAHeader ReadHeader()

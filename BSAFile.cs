@@ -1,4 +1,5 @@
-﻿using BSAsharp.Format;
+﻿//#define ALWAYS_INFLATE
+using BSAsharp.Format;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,9 +18,6 @@ namespace BSAsharp
     {
         const uint FLAG_COMPRESS = 1 << 30;
 
-        public static bool DefaultCompressed { get; set; }
-        public static bool BStringPrefixed { get; set; }
-
         public string Name { get; private set; }
         public string Filename { get; private set; }
         public bool IsCompressed { get; private set; }
@@ -27,24 +25,24 @@ namespace BSAsharp
 
         private readonly bool LeaveOpen;
 
-        public BSAFile(string path, string name, byte[] data, bool compress = true)
-        {
-            this.Name = name.ToLowerInvariant();
-            this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
+        //public BSAFile(string path, string name, byte[] data, bool compress = true)
+        //{
+        //    this.Name = name.ToLowerInvariant();
+        //    this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
 
-            this.Data = data;
-            this.IsCompressed = compress;
-        }
+        //    this.Data = data;
+        //    this.IsCompressed = compress;
+        //}
 
-        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool preSeek = true, bool leaveOpen = true)
-            : this(path, name, baseRec)
+        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool defaultCompressed, bool preSeek = true, bool leaveOpen = true)
+            : this(path, name, baseRec, defaultCompressed)
         {
             this.LeaveOpen = leaveOpen;
             if (preSeek)
                 reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
             ReadFileBlock(reader, baseRec.size);
         }
-        internal BSAFile(string path, string name, FileRecord baseRec)
+        private BSAFile(string path, string name, FileRecord baseRec, bool defaultCompressed)
         {
             this.Name = name.ToLowerInvariant();
             this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
@@ -52,16 +50,16 @@ namespace BSAsharp
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
             if (compressBitSet)
                 baseRec.size ^= FLAG_COMPRESS;
-            this.IsCompressed = DefaultCompressed ^ compressBitSet;
+            this.IsCompressed = defaultCompressed ^ compressBitSet;
         }
 
         private void ReadFileBlock(BinaryReader reader, uint size)
         {
-            if (BStringPrefixed)
-            {
-                throw new NotImplementedException();
-                //var name = reader.ReadBString();
-            }
+            //if (BStringPrefixed)
+            //{
+            //    throw new NotImplementedException();
+            //    //var name = reader.ReadBString();
+            //}
 
             if (size == 0 || (size <= 4 && IsCompressed))
             {
@@ -74,6 +72,7 @@ namespace BSAsharp
                 var originalSize = reader.ReadUInt32();
                 size -= sizeof(uint);
 
+#if ALWAYS_INFLATE
                 //Skips zlib descriptors
                 reader.BaseStream.Seek(2, SeekOrigin.Current);
 
@@ -81,6 +80,9 @@ namespace BSAsharp
 
                 Trace.Assert(decompressedData.Length == originalSize);
                 this.Data = decompressedData;
+#else
+                this.Data = reader.ReadBytes((int)size);
+#endif
             }
             else
             {

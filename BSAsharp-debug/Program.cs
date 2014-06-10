@@ -20,11 +20,10 @@ namespace BSAsharp_debug
                 return;
             }
 
-            using (var wrapper = new BSAsharp.BSAWrapper(@"test.bsa"))
-            //using (var wrapper = new BSAsharp.BSAWrapper(args[0]))
+            //using (var wrapper = new BSAsharp.BSAWrapper(@"test.bsa"))
+            using (var wrapper = new BSAsharp.BSAWrapper(args[0]))
             {
-                Console.WriteLine(wrapper.ToList());
-                wrapper.Save();
+                wrapper.Save(args[1]);
 
                 var extractWatch = new Stopwatch();
                 try

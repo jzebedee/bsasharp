@@ -85,7 +85,7 @@ namespace BSAsharp
             var fileLookup = pathedFiles.ToLookup(tup => tup.Item1, tup => Tuple.Create(tup.Item2, tup.Item3));
             return
                 from g in fileLookup
-                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, ReaderFromMMF<byte>(tup.Item2.size, tup.Item2.offset), false, false)));
+                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, ReaderFromMMF<byte>(tup.Item2.size, tup.Item2.offset), DefaultCompressed, false, false)));
         }
 
         protected override BSAHeader ReadHeader()

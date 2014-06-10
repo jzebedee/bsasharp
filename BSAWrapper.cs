@@ -50,25 +50,26 @@ namespace BSAsharp
             GC.SuppressFinalize(this);
         }
 
-        public void Save()
+        public void Save(string outBsa, BSAHeader header = null)
         {
             var allFileNames = this.SelectMany(fold => fold.Children).Select(file => file.Name);
 
             //using (var writer = new BinaryWriter(BSAMap.CreateViewStream(0, 0, MemoryMappedFileAccess.ReadWrite)))
-            using (var writer = new BinaryWriter(File.OpenWrite(@"test.bsa")))
+            using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                var header = new BSAHeader
-                {
-                    field = BSA_GREET,
-                    version = FALLOUT3_VERSION,
-                    offset = 0x24, //(uint)Marshal.SizeOf(typeof(BSAHeader)),
-                    archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles,// | ArchiveFlags.Compressed,
-                    folderCount = (uint)this.Count(),
-                    fileCount = (uint)allFileNames.Count(),
-                    totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
-                    totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
-                    fileFlags = CreateFileFlags(allFileNames)
-                };
+                header =
+                    BSAReader.Header ?? new BSAHeader
+                    {
+                        field = BSA_GREET,
+                        version = FALLOUT3_VERSION,
+                        offset = 0x24, //(uint)Marshal.SizeOf(typeof(BSAHeader)),
+                        archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles,// | ArchiveFlags.Compressed,
+                        folderCount = (uint)this.Count(),
+                        fileCount = (uint)allFileNames.Count(),
+                        totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
+                        totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
+                        fileFlags = CreateFileFlags(allFileNames)
+                    };
 
                 writer.WriteStruct<BSAHeader>(header);
 
@@ -102,8 +103,9 @@ namespace BSAsharp
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<long, uint>(kvpA.Value, kvpB.Value));
                 var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<long, uint>(kvpA.Value, kvpB.Value));
+                var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets);
 
-                folderRecordOffsets.ToList()
+                completeOffsets.ToList()
                     .ForEach(kvp =>
                     {
                         writer.BaseStream.Seek(kvp.Key, SeekOrigin.Begin);

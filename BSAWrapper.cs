@@ -81,9 +81,10 @@ namespace BSAsharp
                 orderedFolders
                     .ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
 
+                //MUST execute this
                 var fullyOrdered =
                     orderedFolders
-                    .Select(a => WriteFileRecordBlock(writer, a.folder));
+                    .Select(a => WriteFileRecordBlock(writer, a.folder)).ToList();
 
                 allFileNames.ToList()
                     .ForEach(fileName => writer.WriteCString(fileName));

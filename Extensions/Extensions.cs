@@ -24,6 +24,7 @@ namespace BSAsharp.Extensions
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();
+
             var bytes = reader.ReadBytes(length);
             var bstring = Windows1252.GetString(bytes);
 

@@ -25,19 +25,16 @@ namespace BSAsharp
         public bool IsCompressed { get; private set; }
         public byte[] Data { get; private set; }
 
-        private readonly bool CloseReader;
-
         internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader)
             : this(path, name, baseRec)
         {
             reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
             ReadFileBlock(reader, baseRec.size);
         }
-        internal BSAFile(string path, string name, FileRecord baseRec, Func<long, long, BinaryReader> getReader)
+        internal BSAFile(string path, string name, FileRecord baseRec, UnmanagedMemoryAccessor accessor)
             : this(path, name, baseRec)
         {
-            this.CloseReader = true;
-            ReadFileBlock(getReader(baseRec.offset, baseRec.size), baseRec.size);
+            ReadFileBlock(accessor, baseRec.size);
         }
 
         private BSAFile(string path, string name, FileRecord baseRec)
@@ -57,12 +54,54 @@ namespace BSAsharp
                 //var name = reader.ReadBString();
             }
 
-            try
+            if (size == 0 || (size <= 4 && IsCompressed))
             {
+                this.Data = new byte[size];
+                return;
+            }
+
+            if (IsCompressed)
+            {
+                var originalSize = reader.ReadUInt32();
+                size -= sizeof(uint);
+
+                var compressedData = reader.ReadBytes((int)size);
+                var decompressedData = ZlibDecompress(compressedData, originalSize);
+
+                Trace.Assert(decompressedData.Length == originalSize);
+                this.Data = decompressedData;
+            }
+            else
+            {
+                this.Data = reader.ReadBytes((int)size);
+            }
+        }
+
+        private void ReadFileBlock(UnmanagedMemoryAccessor reader, uint size)
+        {
+            using (reader)
+            {
+                if (BStringPrefixed)
+                {
+                    throw new NotImplementedException();
+                    //var name = reader.ReadBString();
+                }
+
+                if (size == 0 || (size <= 4 && IsCompressed))
+                {
+                    this.Data = new byte[size];
+                    return;
+                }
+
                 if (IsCompressed)
                 {
-                    var originalSize = reader.ReadUInt32();
-                    var compressedData = reader.ReadBytes((int)size);
+                    var originalSize = reader.ReadUInt32(0);
+                    size -= sizeof(uint);
+
+                    byte[] compressedData = new byte[size];
+                    int bytesRead = reader.ReadArray<byte>(sizeof(uint), compressedData, 0, (int)size);
+                    Trace.Assert(bytesRead == size);
+
                     var decompressedData = ZlibDecompress(compressedData, originalSize);
 
                     Trace.Assert(decompressedData.Length == originalSize);
@@ -70,13 +109,10 @@ namespace BSAsharp
                 }
                 else
                 {
-                    this.Data = reader.ReadBytes((int)size);
+                    this.Data = new byte[size];
+                    int bytesRead = reader.ReadArray<byte>(0, this.Data, 0, (int)size);
+                    Trace.Assert(bytesRead == size);
                 }
-            }
-            finally
-            {
-                if (CloseReader)
-                    reader.Dispose();
             }
         }
 

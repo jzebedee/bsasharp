@@ -6,7 +6,7 @@ using System.Text;
 namespace BSAsharp.Format
 {
     [Flags]
-    enum FileFlags
+    public enum FileFlags
     {
         Nif = 0x1,
         Dds = 0x2,

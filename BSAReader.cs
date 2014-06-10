@@ -11,11 +11,19 @@ namespace BSAsharp
 {
     public class BSAReader : IDisposable
     {
-        private readonly BinaryReader _reader;
+        protected BinaryReader Reader { get; set; }
 
+        /// <summary>
+        /// Initializes a standard I/O reader for a BSA
+        /// </summary>
+        /// <param name="bsaStream">A stream that represents the BSA to read</param>
         public BSAReader(Stream bsaStream)
         {
-            this._reader = new BinaryReader(bsaStream);
+            this.Reader = new BinaryReader(bsaStream);
+        }
+        protected BSAReader()
+        {
+
         }
         ~BSAReader()
         {
@@ -26,7 +34,7 @@ namespace BSAsharp
         {
             if (disposing)
             {
-                _reader.Dispose();
+                Reader.Dispose();
             }
         }
         public void Dispose()
@@ -35,43 +43,36 @@ namespace BSAsharp
             GC.SuppressFinalize(this);
         }
 
-        public List<BSAFolder> Read()
+        public IEnumerable<BSAFolder> Read()
         {
             var header = ReadHeader();
-            var folderDict = ReadFolders(header.folderCount);
+            var kvpList = ReadFolders(header.folderCount);
 
             BSAFile.DefaultCompressed = header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
             BSAFile.BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
 
-            var fileNames = ReadFilenames(header.fileCount);
+            var fileNames = ReadFileNameBlocks(header.fileCount);
 
-            return BuildBSALayout(folderDict, fileNames);
+            return BuildBSALayout(kvpList, fileNames);
         }
 
-        private BSAHeader ReadHeader()
+        protected virtual IEnumerable<BSAFolder> BuildBSALayout(List<KeyValuePair<string, FileRecord>> kvpList, List<string> fileNames)
         {
-            return _reader.ReadStruct<BSAHeader>();
+            var pathedFiles = kvpList.Zip(fileNames, (kvp, fn) => Tuple.Create(kvp.Key, fn, kvp.Value));
+            var fileLookup = pathedFiles.ToLookup(tup => tup.Item1, tup => Tuple.Create(tup.Item2, tup.Item3));
+            return
+                from g in fileLookup
+                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, Reader)));
         }
 
-        private List<BSAFolder> BuildBSALayout(Dictionary<string, List<FileRecord>> folderDict, List<string> fileNames)
+        protected virtual BSAHeader ReadHeader()
         {
-            int i = 0;
-            return (from kvp in folderDict
-                   let path = kvp.Key
-                   let fileRecs = kvp.Value
-                   select new BSAFolder(path, fileRecs.Select(fr => new BSAFile(path, fileNames[i++], fr, _reader)))).ToList();
+            return Reader.ReadStruct<BSAHeader>();
         }
 
-        private List<string> ReadFilenames(uint fileCount)
+        protected virtual List<KeyValuePair<string, FileRecord>> ReadFolders(uint folderCount)
         {
-            return (from fileName in ReadFileNameBlocks(fileCount)
-                    //let hash = CreateHash(Path.GetFileNameWithoutExtension(fileName), Path.GetExtension(fileName))
-                    select fileName).ToList();
-        }
-
-        private Dictionary<string, List<FileRecord>> ReadFolders(uint folderCount)
-        {
-            var folderDict = new Dictionary<string, List<FileRecord>>();
+            var kvpList = new List<KeyValuePair<string, FileRecord>>();
 
             var folders = ReadFolderRecord(folderCount);
             foreach (var folder in folders)
@@ -79,47 +80,47 @@ namespace BSAsharp
                 string name;
                 var frbs = ReadFileRecordBlocks(folder.count, out name);
 
-                folderDict.Add(name, frbs);
+                kvpList.AddRange(frbs.Select(fr => new KeyValuePair<string, FileRecord>(name, fr)));
             }
 
-            return folderDict;
+            return kvpList;
         }
 
-        private List<FolderRecord> ReadFolderRecord(uint count)
+        protected virtual List<FolderRecord> ReadFolderRecord(uint count)
         {
             var folders = new List<FolderRecord>((int)count);
 
             for (uint i = 0; i < count; i++)
-                folders.Add(_reader.ReadStruct<FolderRecord>());
+                folders.Add(Reader.ReadStruct<FolderRecord>());
 
             return folders;
         }
 
-        private List<FileRecord> ReadFileRecordBlocks(uint count, out string name)
+        protected virtual List<FileRecord> ReadFileRecordBlocks(uint count, out string name)
         {
-            var fileRecords = new List<FileRecord>();
+            var fileRecords = new List<FileRecord>((int)count);
 
-            name = _reader.ReadBString(true);
+            name = Reader.ReadBString(true);
             for (uint i = 0; i < count; i++)
             {
-                var record = _reader.ReadStruct<FileRecord>();
+                var record = Reader.ReadStruct<FileRecord>();
                 fileRecords.Add(record);
             }
 
             return fileRecords;
         }
 
-        private List<string> ReadFileNameBlocks(uint count)
+        protected virtual List<string> ReadFileNameBlocks(uint count)
         {
-            var fileNames = new List<string>();
+            var fileNames = new List<string>((int)count);
 
             for (int i = 0; i < count; i++)
-                fileNames.Add(_reader.ReadCString());
+                fileNames.Add(Reader.ReadCString());
 
             return fileNames;
         }
 
-        private static ulong CreateHash(string fname, string ext)
+        protected static ulong CreateHash(string fname, string ext)
         {
             Trace.Assert(fname.Length > 0);
             ulong hash1 = (ulong)(fname[fname.Length - 1] | ((fname.Length > 2 ? fname[fname.Length - 2] : 0) << 8) | fname.Length << 16 | fname[0] << 24);

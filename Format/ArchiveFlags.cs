@@ -6,7 +6,7 @@ using System.Text;
 namespace BSAsharp.Format
 {
     [Flags]
-    enum ArchiveFlags
+    public enum ArchiveFlags
     {
         NamedDirectories = 0x1,
         NamedFiles = 0x2,

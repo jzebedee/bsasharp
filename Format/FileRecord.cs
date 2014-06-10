@@ -7,7 +7,7 @@ using System.Text;
 namespace BSAsharp.Format
 {
     [StructLayout(LayoutKind.Sequential)]
-    class FileRecord
+    public class FileRecord
     {
         public ulong hash;
         public uint size;

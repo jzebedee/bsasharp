@@ -52,6 +52,7 @@
     <Compile Include="Format\FileFlags.cs" />
     <Compile Include="Format\FileRecord.cs" />
     <Compile Include="Format\FolderRecord.cs" />
+    <Compile Include="MemoryMappedBSAReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

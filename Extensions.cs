@@ -77,7 +77,7 @@ namespace BSAsharp
             return newBuf;
         }
 
-        public static void WriteStruct<T>(this BinaryWriter writer, T obj) where T : struct
+        public static void WriteStruct<T>(this BinaryWriter writer, T obj)// where T : struct
         {
             int size = Marshal.SizeOf(obj);
             var buf = new byte[size];

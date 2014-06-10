@@ -7,7 +7,7 @@ using System.Text;
 namespace BSAsharp.Format
 {
     [StructLayout(LayoutKind.Sequential)]
-    class FolderRecord
+    public class FolderRecord
     {
         public ulong hash;
         public uint count;

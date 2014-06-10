@@ -5,6 +5,9 @@ using System.Text;
 
 namespace BSAsharp
 {
+    /// <summary>
+    /// A managed representation of a BSA folder.
+    /// </summary>
     public class BSAFolder
     {
         public string Path { get; private set; }

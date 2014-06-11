@@ -8,10 +8,12 @@ using System.Text;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
 using System.Threading;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 
 namespace BSAsharp
 {
-    public class BSAWrapper : ICollection<BSAFolder>
+    public class BSAWrapper : SortedSet<BSAFolder>
     {
         const int
             FALLOUT3_VERSION = 0x68,
@@ -22,10 +24,9 @@ namespace BSAsharp
         //private MemoryMappedFile BSAMap { get; set; }
         //private MemoryMappedBSAReader BSAReader { get; set; }
 
-        private readonly SortedSet<BSAFolder> _folders;
         private readonly BSAHeader _readHeader;
 
-        private readonly int _initSethash;
+        private readonly bool _defaultCompress;
 
         private Dictionary<BSAFolder, long> _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
         private Dictionary<BSAFolder, uint> _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
@@ -33,32 +34,79 @@ namespace BSAsharp
         private Dictionary<BSAFile, long> _fileRecordOffsetsA = new Dictionary<BSAFile, long>();
         private Dictionary<BSAFile, uint> _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
 
-        private bool Modified { get { return _initSethash != _folders.GetHashCode(); } }
-
+        /// <summary>
+        /// Creates a new BSAWrapper instance around an existing BSA file
+        /// </summary>
+        /// <param name="bsaPath">The path of the file to open</param>
         public BSAWrapper(string bsaPath)
+            : this(MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open))
         {
-            using (var BSAMap = MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open))
-            using (var BSAReader = new MemoryMappedBSAReader(BSAMap))
-            {
-                _folders = new SortedSet<BSAFolder>(BSAReader.Read(), new BSAFolderComparer());
-                _readHeader = BSAReader.Header;
-            }
-
-            _initSethash = _folders.GetHashCode();
         }
-        public BSAWrapper()
+        /// <summary>
+        /// Creates a new BSAWrapper instance from an existing folder structure
+        /// </summary>
+        /// <param name="packFolder">The path of the folder to pack</param>
+        /// <param name="defaultCompressed">The default compression state for the archive</param>
+        public BSAWrapper(string packFolder, bool defaultCompressed)
+            : this()
         {
-            _folders = new SortedSet<BSAFolder>(new BSAFolderComparer());
-            _initSethash = _folders.GetHashCode();
+            this._defaultCompress = defaultCompressed;
+            Pack(packFolder);
+        }
+        /// <summary>
+        /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
+        /// </summary>
+        public BSAWrapper()
+            : this(new SortedSet<BSAFolder>())
+        {
+        }
+
+        //wtf C#
+        //please get real ctor overloads someday
+        private BSAWrapper(MemoryMappedFile BSAMap)
+            : this(new MemoryMappedBSAReader(BSAMap))
+        {
+            BSAMap.Dispose();
+        }
+        private BSAWrapper(MemoryMappedBSAReader BSAReader)
+            : this(BSAReader.Read())
+        {
+            this._readHeader = BSAReader.Header;
+            BSAReader.Dispose();
+        }
+        private BSAWrapper(IEnumerable<BSAFolder> collection)
+            : base(collection, HashComparer.Instance)
+        {
+        }
+
+        public void Pack(string packFolder)
+        {
+            var packDirectories = Directory.EnumerateDirectories(packFolder, "*", SearchOption.AllDirectories);
+            var bsaFolders = packDirectories
+                .Select(path =>
+                {
+                    var packFiles = Directory.EnumerateFiles(path);
+
+                    var trimmedPath = path.Replace(packFolder, "").TrimStart(Path.DirectorySeparatorChar);
+                    var bsaFiles = packFiles.Select(file => new BSAFile(trimmedPath, Path.GetFileName(file), File.ReadAllBytes(file), _defaultCompress));
+
+                    return new BSAFolder(trimmedPath, bsaFiles);
+                });
+
+            bsaFolders.ToList()
+                .ForEach(folder => Add(folder));
         }
 
         public void Extract(string outFolder)
         {
+            if (Directory.Exists(outFolder))
+                Directory.Delete(outFolder, true);
+
             foreach (var folder in this)
             {
                 Directory.CreateDirectory(Path.Combine(outFolder, folder.Path));
 
-                foreach (var file in folder.Children)
+                foreach (var file in folder)
                 {
                     var filePath = Path.Combine(outFolder, file.Filename);
                     File.WriteAllBytes(filePath, file.GetSaveData(true));
@@ -66,17 +114,17 @@ namespace BSAsharp
             }
         }
 
-        public void Save(string outBsa)
+        public void Save(string outBsa, bool recheck = true)
         {
-            var allFileNames = this.SelectMany(fold => fold.Children).Select(file => file.Name);
+            var allFileNames = this.SelectMany(fold => fold).Select(file => file.Name);
 
             File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                var oldHeader = Modified ? null : _readHeader;
-                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
+                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles | (_defaultCompress ? ArchiveFlags.Compressed : 0);
 
-                var header = oldHeader ?? new BSAHeader
+                var header =
+                    (recheck ? null : _readHeader) ?? new BSAHeader
                     {
                         field = BSA_GREET,
                         version = FALLOUT3_VERSION,
@@ -138,7 +186,7 @@ namespace BSAsharp
                 new FolderRecord
                 {
                     hash = folder.Hash,
-                    count = (uint)folder.Children.Count(),
+                    count = (uint)folder.Count(),
                     offset = 0
                 };
         }
@@ -169,9 +217,9 @@ namespace BSAsharp
 
             writer.WriteBString(folder.Path);
 
-            var sortedKids = (from file in folder.Children
+            var sortedKids = (from file in folder
                               let record = CreateFileRecord(file)
-                              orderby record.hash
+                              //orderby record.hash
                               select new { file, record }).ToList();
 
             sortedKids.ForEach(a =>
@@ -213,51 +261,6 @@ namespace BSAsharp
                 flags |= FileFlags.Ctl;
 
             return flags;
-        }
-
-        public void Add(BSAFolder item)
-        {
-            _folders.Add(item);
-        }
-
-        public void Clear()
-        {
-            _folders.Clear();
-        }
-
-        public bool Contains(BSAFolder item)
-        {
-            return _folders.Contains(item);
-        }
-
-        public void CopyTo(BSAFolder[] array, int arrayIndex)
-        {
-            _folders.CopyTo(array, arrayIndex);
-        }
-
-        public int Count
-        {
-            get { return _folders.Count; }
-        }
-
-        public bool IsReadOnly
-        {
-            get { return false; }
-        }
-
-        public bool Remove(BSAFolder item)
-        {
-            return _folders.Remove(item);
-        }
-
-        public IEnumerator<BSAFolder> GetEnumerator()
-        {
-            return _folders.GetEnumerator();
-        }
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
     }
 }

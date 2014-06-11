@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BSAsharp;
 
 namespace BSAsharp_debug
 {
@@ -47,40 +48,42 @@ namespace BSAsharp_debug
                     }
                 });
 
-            if (inFile != null) //handle pack folder somewhere
+            var extractWatch = new Stopwatch();
+            try
             {
-                var wrapper = new BSAsharp.BSAWrapper(inFile);
+                extractWatch.Start();
 
-                var extractWatch = new Stopwatch();
-                try
+                BSAWrapper wrapper = null;
+                if (inFile != null)
+                    wrapper = new BSAWrapper(inFile);
+                else if (packFolder != null)
+                    wrapper = new BSAWrapper(packFolder, true);
+                Trace.Assert(wrapper != null);
+
+                foreach (var folder in wrapper)
                 {
-                    extractWatch.Start();
-
-                    foreach (var folder in wrapper)
+                    Console.WriteLine(folder.Path);
+                    foreach (var file in folder)
                     {
-                        Console.WriteLine(folder.Path);
-                        foreach (var child in folder.Children)
-                        {
-                            Console.Write('\t');
-                            Console.WriteLine("{0} ({1} bytes, {2})", child.Name, child.Size, child.IsCompressed ? "Compressed" : "Uncompressed");
-                        }
-                        //Console.ReadKey();
+                        Console.Write('\t');
+                        Console.WriteLine("{0} ({1} bytes, {2})", file.Name, file.Size, file.IsCompressed ? "Compressed" : "Uncompressed");
                     }
-                }
-                finally
-                {
-                    extractWatch.Stop();
+                    //Console.ReadKey();
                 }
 
                 if (unpackFolder != null)
                     wrapper.Extract(unpackFolder);
                 if (outFile != null)
                     wrapper.Save(outFile);
-
-                Console.WriteLine();
-                Console.WriteLine("Complete in " + extractWatch.Elapsed.ToString() + ".");
-                Console.ReadKey();
             }
+            finally
+            {
+                extractWatch.Stop();
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Complete in " + extractWatch.Elapsed.ToString() + ".");
+            Console.ReadKey();
         }
     }
 }

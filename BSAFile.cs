@@ -14,7 +14,7 @@ namespace BSAsharp
     /// <summary>
     /// A managed representation of a BSA file record and its contents. BSAFile is not guaranteed to be valid after the BSAReader that created it is disposed.
     /// </summary>
-    public class BSAFile
+    public class BSAFile : IHashed
     {
         const uint FLAG_COMPRESS = 1 << 30;
 
@@ -46,14 +46,11 @@ namespace BSAsharp
         private readonly bool LeaveOpen;
         private readonly bool DefaultCompressed;
 
-        //public BSAFile(string path, string name, byte[] data, bool compress = true)
-        //{
-        //    this.Name = name.ToLowerInvariant();
-        //    this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
-
-        //    this.Data = data;
-        //    this.IsCompressed = compress;
-        //}
+        public BSAFile(string path, string name, byte[] data, bool defaultCompressed, bool compressBit = false) : this(path, name, defaultCompressed)
+        {
+            this.Data = data;
+            this.IsCompressed = defaultCompressed ^ compressBit;
+        }
 
         internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool defaultCompressed, bool preSeek = true, bool leaveOpen = true)
             : this(path, name, baseRec, defaultCompressed)
@@ -64,22 +61,22 @@ namespace BSAsharp
 
             ReadFileBlock(reader, baseRec.size);
         }
-        private BSAFile(string path, string name, FileRecord baseRec, bool defaultCompressed)
-            : this()
-        {
-            this.Name = name.ToLowerInvariant();
-            this.Filename = Path.Combine(path, name);
-            this.DefaultCompressed = defaultCompressed;
 
+        private BSAFile(string path, string name, FileRecord baseRec, bool defaultCompressed)
+            : this(path, name, defaultCompressed)
+        {
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
             if (compressBitSet)
                 baseRec.size ^= FLAG_COMPRESS;
 
             this.IsCompressed = defaultCompressed ^ compressBitSet;
         }
-
-        private BSAFile()
+        private BSAFile(string path, string name, bool defaultCompressed)
         {
+            this.Name = name.ToLowerInvariant();
+            this.Filename = Path.Combine(path, name);
+            this.DefaultCompressed = defaultCompressed;
+
             _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)));
         }
 

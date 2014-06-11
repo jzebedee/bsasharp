@@ -21,6 +21,19 @@ namespace BSAsharp.Extensions
             return readBytes.MarshalStruct<T>();
         }
 
+        public static IEnumerable<T> ReadBulkStruct<T>(this BinaryReader reader, int Count, int? Size = null)// where T : struct
+        {
+            int structSize = Size ?? Marshal.SizeOf(typeof(T));
+            int bulkLength = structSize * Count;
+
+            byte[] readBytes = reader.ReadBytes(bulkLength);
+            if (readBytes.Length != bulkLength)
+                throw new ArgumentException("Size of bytes read did not match expected size");
+
+            for (int i = 0; i < Count; i++)
+                yield return readBytes.MarshalStruct<T>(i * structSize);
+        }
+
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();

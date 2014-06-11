@@ -4,48 +4,44 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Text;
-using BSAsharp.Format;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using BSAsharp.Format;
+using BSAsharp.Extensions;
 
 namespace BSAsharp
 {
-    internal class MemoryMappedBSAReader : BSAReader
+    internal class MemoryMappedBSAReader : IDisposable
     {
         public const long TWO_GB_SIZE = 2147483648; //2^31
 
+        protected bool DefaultCompressed { get; set; }
+        //private bool BStringPrefixed { get; set; }
+
+        public BSAHeader Header { get; protected set; }
+
         private readonly MemoryMappedFile _mmf;
-        private BSAHeader _header;
-
-        private long _offset = 0;
-
-        public string MemoryMapName { get; private set; }
-
-        /// <summary>
-        /// Initializes a memory-mapped reader for a BSA
-        /// </summary>
-        /// <param name="bsaStream">A path to the BSA file to read</param>
-        /// <param name="size">The size of the BSA in bytes</param>
-        public MemoryMappedBSAReader(string bsaPath, long size)
-        {
-            if (size > TWO_GB_SIZE)
-                throw new ArgumentException("BSA cannot be greater than 2GiB");
-
-            this._mmf = MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, (MemoryMapName = Path.GetFileName(Path.GetTempFileName())), size, MemoryMappedFileAccess.ReadWrite);
-        }
 
         public MemoryMappedBSAReader(MemoryMappedFile mmf)
         {
-            this._mmf = mmf;//MemoryMappedFile.CreateOrOpen((MemoryMapName = memoryMappedBSA), TWO_GB_SIZE, MemoryMappedFileAccess.ReadWrite);
+            this._mmf = mmf;
+        }
+        ~MemoryMappedBSAReader()
+        {
+            Dispose(false);
         }
 
-        protected override void Dispose(bool disposing)
+        protected virtual void Dispose(bool disposing)
         {
             if (disposing)
             {
                 _mmf.Dispose();
             }
-
-            base.Dispose(disposing);
+        }
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         private Stream FromMMF(long offset, long size)
@@ -63,86 +59,97 @@ namespace BSAsharp
             return FromMMF(offset, Marshal.SizeOf(typeof(T)) * count);
         }
 
-        private BinaryReader ReaderFromMMF<T>(long offset = -1)
+        private BinaryReader ReaderFromMMF<T>(long offset)
         {
-            return new BinaryReader(FromMMF<T>(offset < 0 ? _offset : offset));
+            return new BinaryReader(FromMMF<T>(offset));
         }
 
-        private BinaryReader ReaderFromMMF<T>(uint count, long offset = -1)
+        private BinaryReader ReaderFromMMF<T>(long offset, uint count)
         {
-            return new BinaryReader(FromMMF<T>(offset < 0 ? _offset : offset, count));
+            return new BinaryReader(FromMMF<T>(offset, count));
         }
 
-        public override IEnumerable<BSAFolder> Read()
+        public IEnumerable<BSAFolder> Read()
         {
-            _offset = 0;
-            return base.Read();
+            Header = ReadHeader();
+            long offset = BSAWrapper.HEADER_OFFSET;
+
+            //BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            Trace.Assert(!Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed));
+
+            var kvpList = ReadFolders(ref offset, Header.folderCount);
+            var fileNames = ReadFileNameBlocks(ref offset, Header.fileCount);
+
+            return BuildBSALayout(kvpList, fileNames);
         }
 
-        protected override IEnumerable<BSAFolder> BuildBSALayout(List<KeyValuePair<string, FileRecord>> kvpList, List<string> fileNames)
+        protected IEnumerable<BSAFolder> BuildBSALayout(List<KeyValuePair<string, FileRecord>> kvpList, List<string> fileNames)
         {
             var pathedFiles = kvpList.Zip(fileNames, (kvp, fn) => Tuple.Create(kvp.Key, fn, kvp.Value));
             var fileLookup = pathedFiles.ToLookup(tup => tup.Item1, tup => Tuple.Create(tup.Item2, tup.Item3));
             return
                 from g in fileLookup
-                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, ReaderFromMMF<byte>(tup.Item2.size, tup.Item2.offset), DefaultCompressed, false, false)));
+                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, ReaderFromMMF<byte>(tup.Item2.offset, tup.Item2.size), DefaultCompressed)));
         }
 
-        protected override BSAHeader ReadHeader()
+        protected BSAHeader ReadHeader()
         {
-            using (Reader = ReaderFromMMF<BSAHeader>())
-                try
-                {
-                    return (_header = base.ReadHeader());
-                }
-                finally
-                {
-                    _offset += Reader.BaseStream.Position;
-                }
+            using (var Reader = ReaderFromMMF<BSAHeader>(0))
+                return Reader.ReadStruct<BSAHeader>();
         }
 
-        protected override List<FolderRecord> ReadFolderRecord(uint count)
+        protected List<KeyValuePair<string, FileRecord>> ReadFolders(ref long offset, uint folderCount)
         {
-            using (Reader = ReaderFromMMF<FolderRecord>(count))
-                try
+            var kvpList = new List<KeyValuePair<string, FileRecord>>();
+
+            using (var frReader = ReaderFromMMF<FolderRecord>(offset, folderCount))
+            {
+                offset += folderCount * Marshal.SizeOf(typeof(FolderRecord));
+
+                var folders = frReader.ReadBulkStruct<FolderRecord>((int)folderCount);
+                foreach (var folder in folders)
                 {
-                    return base.ReadFolderRecord(count);
+                    string name;
+                    var fileRecords = ReadFileRecordBlocks(ref offset, folder.count, out name);
+
+                    kvpList.AddRange(fileRecords.Select(record => new KeyValuePair<string, FileRecord>(name, record)));
                 }
-                finally
-                {
-                    _offset += Reader.BaseStream.Position;
-                }
+            }
+
+            return kvpList;
         }
 
-        protected override List<FileRecord> ReadFileRecordBlocks(uint count, out string name)
+        protected List<FileRecord> ReadFileRecordBlocks(ref long offset, uint count, out string name)
         {
-            int size = 1; //name-length byte
-            using (var stream = FromMMF(_offset, 0xFF))
+            long size = sizeof(byte); //name-length byte
+            using (var stream = FromMMF(offset, size))
             {
                 size += stream.ReadByte(); //folder name length
             }
-            using (Reader = new BinaryReader(FromMMF(_offset, size + (count * Marshal.SizeOf(typeof(FileRecord))))))
-                try
-                {
-                    return base.ReadFileRecordBlocks(count, out name);
-                }
-                finally
-                {
-                    _offset += Reader.BaseStream.Position;
-                }
+
+            size += count * Marshal.SizeOf(typeof(FileRecord));
+            using (var frbReader = new BinaryReader(FromMMF(offset, size)))
+            {
+                offset += size;
+
+                name = frbReader.ReadBString(true);
+                return frbReader.ReadBulkStruct<FileRecord>((int)count).ToList();
+            }
         }
 
-        protected override List<string> ReadFileNameBlocks(uint count)
+        protected List<string> ReadFileNameBlocks(ref long offset, uint count)
         {
-            using (Reader = new BinaryReader(FromMMF(_offset, _header.totalFileNameLength)))
-                try
-                {
-                    return base.ReadFileNameBlocks(count);
-                }
-                finally
-                {
-                    _offset += Reader.BaseStream.Position;
-                }
+            using (var Reader = new BinaryReader(FromMMF(offset, Header.totalFileNameLength)))
+            {
+                var fileNames = new List<string>((int)count);
+
+                for (int i = 0; i < count; i++)
+                    fileNames.Add(Reader.ReadCString());
+                offset += Header.totalFileNameLength;
+
+                return fileNames;
+            }
         }
     }
 }

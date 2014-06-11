@@ -49,7 +49,6 @@
     <Compile Include="BSAFile.cs" />
     <Compile Include="BSAFolder.cs" />
     <Compile Include="HashComparer.cs" />
-    <Compile Include="BSAReader.cs" />
     <Compile Include="BSAWrapper.cs" />
     <Compile Include="Extensions\Extensions.cs" />
     <Compile Include="Extensions\Util.cs" />

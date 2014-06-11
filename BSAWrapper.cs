@@ -15,14 +15,11 @@ namespace BSAsharp
 {
     public class BSAWrapper : SortedSet<BSAFolder>
     {
-        const int
+        public const int
             FALLOUT3_VERSION = 0x68,
             HEADER_OFFSET = 0x24; //Marshal.SizeOf(typeof(BSAHeader))
 
         static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
-
-        //private MemoryMappedFile BSAMap { get; set; }
-        //private MemoryMappedBSAReader BSAReader { get; set; }
 
         private readonly BSAHeader _readHeader;
 

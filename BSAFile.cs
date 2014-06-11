@@ -40,38 +40,36 @@ namespace BSAsharp
         }
         public uint OriginalSize { get; private set; }
 
-        private readonly Lazy<ulong> _hash;
+        private Lazy<ulong> _hash;
         public ulong Hash { get { return _hash.Value; } }
 
-        private byte[] Data { get; set; } //data should be "untouched": deflated for IsCompressed files, raw for !IsCompressed
+        private Lazy<byte[]> _data;
+        private byte[] _fixedData;
+        private byte[] Data
+        { //data should be "untouched": deflated for IsCompressed files, raw for !IsCompressed
+            get
+            {
+                return _fixedData ?? _data.Value;
+            }
+            set
+            {
+                _fixedData = value;
+            }
+        }
 
-        private readonly bool LeaveOpen;
         private readonly bool DefaultCompressed;
 
         public BSAFile(string path, string name, byte[] data, bool defaultCompressed, bool inputCompressed, bool compressBit = false)
             : this(path, name, defaultCompressed)
         {
             //inputCompressed param specifies compression of data param, NOT final result!
-            this.Data = data;
-            if (this.IsCompressed = defaultCompressed ^ compressBit)
-            {
-                this.OriginalSize = (uint)data.Length;
-                this.Data = GetDeflatedData(!inputCompressed);
-            }
-            else
-            {
-                this.Data = GetInflatedData(inputCompressed);
-            }
+            UpdateData(data, inputCompressed, compressBit);
         }
 
-        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool defaultCompressed, bool preSeek = true, bool leaveOpen = true)
+        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool defaultCompressed)
             : this(path, name, baseRec, defaultCompressed)
         {
-            this.LeaveOpen = leaveOpen;
-            if (preSeek)
-                reader.BaseStream.Seek(baseRec.offset, SeekOrigin.Begin);
-
-            ReadFileBlock(reader, baseRec.size);
+            _data = new Lazy<byte[]>(() => ReadFileBlock(reader, baseRec.size));
         }
 
         private BSAFile(string path, string name, FileRecord baseRec, bool defaultCompressed)
@@ -85,16 +83,35 @@ namespace BSAsharp
         }
         private BSAFile(string path, string name, bool defaultCompressed)
         {
+            UpdatePath(path, name);
+            this.DefaultCompressed = defaultCompressed;
+        }
+
+        public void UpdatePath(string path, string name)
+        {
             this.Name = name.ToLowerInvariant();
             this.Filename = Path.Combine(path, name);
-            this.DefaultCompressed = defaultCompressed;
+            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)), true);
+        }
 
-            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)));
+        public void UpdateData(byte[] buf, bool inputCompressed, bool compressBit = false)
+        {
+            this.Data = buf;
+            if (this.IsCompressed = DefaultCompressed ^ compressBit)
+            {
+                this.OriginalSize = (uint)buf.Length;
+                this.Data = GetDeflatedData(!inputCompressed);
+            }
+            else
+            {
+                this.Data = GetInflatedData(inputCompressed);
+            }
         }
 
         public byte[] GetSaveData(bool inflate)
         {
             byte[] outData;
+
             if (IsCompressed)
             {
                 if (!inflate)
@@ -119,7 +136,7 @@ namespace BSAsharp
             return Data;
         }
 
-        public byte[] GetDeflatedData(bool force = false)
+        private byte[] GetDeflatedData(bool force = false)
         {
             if (IsCompressed ^ force)
                 return this.Data;
@@ -130,7 +147,7 @@ namespace BSAsharp
             }
         }
 
-        public byte[] GetInflatedData(bool force = false)
+        private byte[] GetInflatedData(bool force = false)
         {
             if (!IsCompressed ^ force)
                 return Data;
@@ -144,7 +161,7 @@ namespace BSAsharp
             }
         }
 
-        private void ReadFileBlock(BinaryReader reader, uint size)
+        private byte[] ReadFileBlock(BinaryReader reader, uint size)
         {
             //if (BStringPrefixed)
             //{
@@ -152,40 +169,55 @@ namespace BSAsharp
             //    //var name = reader.ReadBString();
             //}
 
-            if (size == 0 || (size <= 4 && IsCompressed))
+            using (reader)
             {
-                this.Data = new byte[0];
-                return;
-            }
+                if (size == 0 || (size <= 4 && IsCompressed))
+                {
+                    return new byte[0];
+                }
 
-            if (IsCompressed)
-            {
-                OriginalSize = reader.ReadUInt32();
-                size -= sizeof(uint);
+                if (IsCompressed)
+                {
+                    OriginalSize = reader.ReadUInt32();
+                    size -= sizeof(uint);
 
-                this.Data = reader.ReadBytes((int)size);
-            }
-            else
-            {
-                this.Data = reader.ReadBytes((int)size);
-                Trace.Assert(this.Data.Length == size);
+                    return reader.ReadBytes((int)size);
+                }
+                else
+                {
+                    return reader.ReadBytes((int)size);
+                }
             }
         }
 
         private byte[] ZlibDecompress(Stream compressedStream, uint originalSize)
         {
+            if (originalSize == 0)
+                return new byte[0];
+
             using (MemoryStream msDecompressed = new MemoryStream((int)originalSize))
             {
                 if (originalSize == 4)
                     //Skip zlib descriptors and ignore header for this file
                     compressedStream.Seek(2, SeekOrigin.Begin);
 
-                using (var infStream = new InflaterInputStream(compressedStream, new Inflater(originalSize == 4)))
+                try
                 {
-                    infStream.CopyTo(msDecompressed);
+                    using (var infStream = new InflaterInputStream(compressedStream, new Inflater(originalSize == 4)))
+                    {
+                        infStream.CopyTo(msDecompressed);
+                    }
+
+                    return msDecompressed.ToArray();
+                }
+                catch (ICSharpCode.SharpZipLib.SharpZipBaseException shze)
+                {
+                    Console.WriteLine("Error inflating " + Filename);
+                    Console.Error.WriteLine(shze.ToString());
+                    Console.ReadKey();
                 }
 
-                return msDecompressed.ToArray();
+                return new byte[0];
             }
         }
 

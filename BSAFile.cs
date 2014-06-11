@@ -8,6 +8,8 @@ using System.Runtime.InteropServices;
 using System.IO.Compression;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
+using ICSharpCode.SharpZipLib.Zip.Compression;
+using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 
 namespace BSAsharp
 {
@@ -27,7 +29,7 @@ namespace BSAsharp
         {
             get
             {
-                uint size = (uint)GetSaveData(false).Length;
+                uint size = (uint)Data.Length;// (uint)GetSaveData(false).Length;
 
                 bool setCompressBit = DefaultCompressed ^ IsCompressed;
                 if (setCompressBit)
@@ -46,10 +48,20 @@ namespace BSAsharp
         private readonly bool LeaveOpen;
         private readonly bool DefaultCompressed;
 
-        public BSAFile(string path, string name, byte[] data, bool defaultCompressed, bool compressBit = false) : this(path, name, defaultCompressed)
+        public BSAFile(string path, string name, byte[] data, bool defaultCompressed, bool inputCompressed, bool compressBit = false)
+            : this(path, name, defaultCompressed)
         {
+            //inputCompressed param specifies compression of data param, NOT final result!
             this.Data = data;
-            this.IsCompressed = defaultCompressed ^ compressBit;
+            if (this.IsCompressed = defaultCompressed ^ compressBit)
+            {
+                this.OriginalSize = (uint)data.Length;
+                this.Data = GetDeflatedData(!inputCompressed);
+            }
+            else
+            {
+                this.Data = GetInflatedData(inputCompressed);
+            }
         }
 
         internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool defaultCompressed, bool preSeek = true, bool leaveOpen = true)
@@ -107,9 +119,9 @@ namespace BSAsharp
             return Data;
         }
 
-        public byte[] GetDeflatedData()
+        public byte[] GetDeflatedData(bool force = false)
         {
-            if (IsCompressed)
+            if (IsCompressed ^ force)
                 return this.Data;
 
             using (var msStream = new MemoryStream(Data))
@@ -118,16 +130,13 @@ namespace BSAsharp
             }
         }
 
-        public byte[] GetInflatedData()
+        public byte[] GetInflatedData(bool force = false)
         {
-            if (!IsCompressed)
+            if (!IsCompressed ^ force)
                 return Data;
 
             using (var msStream = new MemoryStream(Data))
             {
-                //Skips zlib descriptors
-                msStream.Seek(2, SeekOrigin.Begin);
-
                 var decompressedData = ZlibDecompress(msStream, OriginalSize);
 
                 Trace.Assert(decompressedData.Length == OriginalSize);
@@ -167,10 +176,13 @@ namespace BSAsharp
         {
             using (MemoryStream msDecompressed = new MemoryStream((int)originalSize))
             {
-                //DeflateStream closes the underlying stream when disposed
-                using (var defStream = new DeflateStream(compressedStream, CompressionMode.Decompress, LeaveOpen))
+                if (originalSize == 4)
+                    //Skip zlib descriptors and ignore header for this file
+                    compressedStream.Seek(2, SeekOrigin.Begin);
+
+                using (var infStream = new InflaterInputStream(compressedStream, new Inflater(originalSize == 4)))
                 {
-                    defStream.CopyTo(msDecompressed);
+                    infStream.CopyTo(msDecompressed);
                 }
 
                 return msDecompressed.ToArray();
@@ -181,10 +193,9 @@ namespace BSAsharp
         {
             using (MemoryStream msCompressed = new MemoryStream())
             {
-                //DeflateStream closes the underlying stream when disposed
-                using (var defStream = new DeflateStream(decompressedStream, CompressionMode.Compress, LeaveOpen))
+                using (var defStream = new DeflaterOutputStream(msCompressed, new Deflater(9)))
                 {
-                    defStream.CopyTo(msCompressed);
+                    decompressedStream.CopyTo(defStream);
                 }
 
                 return msCompressed.ToArray();

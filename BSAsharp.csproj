@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="BSAFile.cs" />
     <Compile Include="BSAFolder.cs" />
+    <Compile Include="BSAFolderComparer.cs" />
     <Compile Include="BSAReader.cs" />
     <Compile Include="BSAWrapper.cs" />
     <Compile Include="Extensions\Extensions.cs" />

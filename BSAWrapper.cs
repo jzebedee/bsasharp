@@ -11,14 +11,21 @@ using System.Threading;
 
 namespace BSAsharp
 {
-    public class BSAWrapper : IEnumerable<BSAFolder>, IDisposable
+    public class BSAWrapper : ICollection<BSAFolder>
     {
-        const int FALLOUT3_VERSION = 0x68;
+        const int
+            FALLOUT3_VERSION = 0x68,
+            HEADER_OFFSET = 0x24; //Marshal.SizeOf(typeof(BSAHeader))
 
         static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
 
-        private MemoryMappedFile BSAMap { get; set; }
-        private MemoryMappedBSAReader BSAReader { get; set; }
+        //private MemoryMappedFile BSAMap { get; set; }
+        //private MemoryMappedBSAReader BSAReader { get; set; }
+
+        private readonly SortedSet<BSAFolder> _folders;
+        private readonly BSAHeader _readHeader;
+
+        private readonly int _initSethash;
 
         private Dictionary<BSAFolder, long> _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
         private Dictionary<BSAFolder, uint> _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
@@ -26,44 +33,55 @@ namespace BSAsharp
         private Dictionary<BSAFile, long> _fileRecordOffsetsA = new Dictionary<BSAFile, long>();
         private Dictionary<BSAFile, uint> _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
 
+        private bool Modified { get { return _initSethash != _folders.GetHashCode(); } }
+
         public BSAWrapper(string bsaPath)
         {
-            this.BSAMap = MemoryMappedFile.CreateFromFile(bsaPath, FileMode.OpenOrCreate);//.CreateOrOpen(Path.GetFileName(Path.GetTempFileName()), MemoryMappedBSAReader.TWO_GB_SIZE, MemoryMappedFileAccess.ReadWrite);
-            this.BSAReader = new MemoryMappedBSAReader(BSAMap);
+            using (var BSAMap = MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open))
+            using (var BSAReader = new MemoryMappedBSAReader(BSAMap))
+            {
+                _folders = new SortedSet<BSAFolder>(BSAReader.Read(), new BSAFolderComparer());
+                _readHeader = BSAReader.Header;
+            }
+
+            _initSethash = _folders.GetHashCode();
         }
-        ~BSAWrapper()
+        public BSAWrapper()
         {
-            Dispose(false);
+            _folders = new SortedSet<BSAFolder>(new BSAFolderComparer());
+            _initSethash = _folders.GetHashCode();
         }
 
-        protected virtual void Dispose(bool disposing)
+        public void Extract(string outFolder)
         {
-            if (disposing)
+            foreach (var folder in this)
             {
-                BSAReader.Dispose();
-                BSAMap.Dispose();
+                Directory.CreateDirectory(Path.Combine(outFolder, folder.Path));
+
+                foreach (var file in folder.Children)
+                {
+                    var filePath = Path.Combine(outFolder, file.Filename);
+                    File.WriteAllBytes(filePath, file.GetSaveData(true));
+                }
             }
         }
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
 
-        public void Save(string outBsa, BSAHeader header = null)
+        public void Save(string outBsa)
         {
             var allFileNames = this.SelectMany(fold => fold.Children).Select(file => file.Name);
 
-            //using (var writer = new BinaryWriter(BSAMap.CreateViewStream(0, 0, MemoryMappedFileAccess.ReadWrite)))
+            File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                header =
-                    BSAReader.Header ?? new BSAHeader
+                var oldHeader = Modified ? null : _readHeader;
+                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
+
+                var header = oldHeader ?? new BSAHeader
                     {
                         field = BSA_GREET,
                         version = FALLOUT3_VERSION,
-                        offset = 0x24, //(uint)Marshal.SizeOf(typeof(BSAHeader)),
-                        archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles,// | ArchiveFlags.Compressed,
+                        offset = HEADER_OFFSET,
+                        archiveFlags = archFlags,
                         folderCount = (uint)this.Count(),
                         fileCount = (uint)allFileNames.Count(),
                         totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
@@ -74,18 +92,18 @@ namespace BSAsharp
                 writer.WriteStruct<BSAHeader>(header);
 
                 var orderedFolders =
-                    (from folder in this
+                    (from folder in this //presorted
                      let record = CreateFolderRecord(folder)
-                     orderby record.hash
-                     select new { folder, record }).ToList();
+                     //orderby record.hash
+                     select new { folder, record });
 
-                orderedFolders
+                orderedFolders.ToList()
                     .ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
 
                 //MUST execute this
                 var fullyOrdered =
                     orderedFolders
-                    .Select(a => WriteFileRecordBlock(writer, a.folder)).ToList();
+                    .Select(a => CreateWriteFileRecordBlock(writer, a.folder)).ToList();
 
                 allFileNames.ToList()
                     .ForEach(fileName => writer.WriteCString(fileName));
@@ -98,7 +116,7 @@ namespace BSAsharp
                      long offset = writer.BaseStream.Position;
                      _fileRecordOffsetsB.Add(file, (uint)offset);
 
-                     writer.Write(file.Data);
+                     writer.Write(file.GetSaveData(false));
                  });
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<long, uint>(kvpA.Value, kvpB.Value));
@@ -139,12 +157,12 @@ namespace BSAsharp
                 new FileRecord
                 {
                     hash = Util.CreateHash(Path.GetFileNameWithoutExtension(file.Name), Path.GetExtension(file.Name)),
-                    size = (uint)file.Data.Length,
+                    size = (uint)file.Size,
                     offset = 0
                 };
         }
 
-        private IEnumerable<BSAFile> WriteFileRecordBlock(BinaryWriter writer, BSAFolder folder)
+        private IEnumerable<BSAFile> CreateWriteFileRecordBlock(BinaryWriter writer, BSAFolder folder)
         {
             long offset = writer.BaseStream.Position;
             _folderRecordOffsetsB.Add(folder, (uint)offset);
@@ -173,6 +191,8 @@ namespace BSAsharp
 
             //flatten children in folders, take extension of each bsafile name and convert to uppercase, take distinct
             var extSet = new HashSet<string>(allFiles.Select(filename => Path.GetExtension(filename).ToUpperInvariant()).Distinct());
+
+            //if this gets unwieldy, could foreach it and have a fall-through switch
             if (extSet.Contains(".NIF"))
                 flags |= FileFlags.Nif;
             if (extSet.Contains(".DDS"))
@@ -195,9 +215,44 @@ namespace BSAsharp
             return flags;
         }
 
+        public void Add(BSAFolder item)
+        {
+            _folders.Add(item);
+        }
+
+        public void Clear()
+        {
+            _folders.Clear();
+        }
+
+        public bool Contains(BSAFolder item)
+        {
+            return _folders.Contains(item);
+        }
+
+        public void CopyTo(BSAFolder[] array, int arrayIndex)
+        {
+            _folders.CopyTo(array, arrayIndex);
+        }
+
+        public int Count
+        {
+            get { return _folders.Count; }
+        }
+
+        public bool IsReadOnly
+        {
+            get { return false; }
+        }
+
+        public bool Remove(BSAFolder item)
+        {
+            return _folders.Remove(item);
+        }
+
         public IEnumerator<BSAFolder> GetEnumerator()
         {
-            return BSAReader.Read().GetEnumerator();
+            return _folders.GetEnumerator();
         }
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()

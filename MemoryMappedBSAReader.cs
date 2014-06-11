@@ -15,7 +15,7 @@ namespace BSAsharp
     {
         public BSAHeader Header { get; protected set; }
 
-        protected ArchiveSettings Settings { get; private set; }
+        public ArchiveSettings Settings { get; private set; }
 
         private readonly MemoryMappedFile _mmf;
 

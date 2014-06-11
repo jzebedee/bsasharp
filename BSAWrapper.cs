@@ -22,13 +22,14 @@ namespace BSAsharp
         static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
 
         private readonly BSAHeader _readHeader;
-        private readonly ArchiveSettings _settings;
 
         private Dictionary<BSAFolder, long> _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
         private Dictionary<BSAFolder, uint> _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
 
         private Dictionary<BSAFile, long> _fileRecordOffsetsA = new Dictionary<BSAFile, long>();
         private Dictionary<BSAFile, uint> _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
+
+        public ArchiveSettings Settings { get; private set; }
 
         /// <summary>
         /// Creates a new BSAWrapper instance around an existing BSA file
@@ -44,17 +45,17 @@ namespace BSAsharp
         /// <param name="packFolder">The path of the folder to pack</param>
         /// <param name="defaultCompressed">The default compression state for the archive</param>
         public BSAWrapper(string packFolder, ArchiveSettings settings)
-            : this()
+            : this(settings)
         {
-            this._settings = settings;
             Pack(packFolder);
         }
         /// <summary>
         /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
         /// </summary>
-        public BSAWrapper()
+        public BSAWrapper(ArchiveSettings settings)
             : this(new SortedSet<BSAFolder>())
         {
+            this.Settings = settings;
         }
 
         //wtf C#
@@ -68,6 +69,7 @@ namespace BSAsharp
             : this(BSAReader.Read())
         {
             this._readHeader = BSAReader.Header;
+            this.Settings = BSAReader.Settings;
             BSAReader.Dispose();
         }
         private BSAWrapper(IEnumerable<BSAFolder> collection)
@@ -84,7 +86,7 @@ namespace BSAsharp
                     var packFiles = Directory.EnumerateFiles(path);
 
                     var trimmedPath = path.Replace(packFolder, "").TrimStart(Path.DirectorySeparatorChar);
-                    var bsaFiles = packFiles.Select(file => new BSAFile(trimmedPath, Path.GetFileName(file), _settings, File.ReadAllBytes(file), false));
+                    var bsaFiles = packFiles.Select(file => new BSAFile(trimmedPath, Path.GetFileName(file), Settings, File.ReadAllBytes(file), false));
 
                     return new BSAFolder(trimmedPath, bsaFiles);
                 });
@@ -117,7 +119,7 @@ namespace BSAsharp
             File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles | (_settings.DefaultCompressed ? ArchiveFlags.Compressed : 0);
+                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles | (Settings.DefaultCompressed ? ArchiveFlags.Compressed : 0);
 
                 var header =
                     (recheck ? null : _readHeader) ?? new BSAHeader

@@ -137,7 +137,7 @@ namespace BSAsharp
             return
                 new FolderRecord
                 {
-                    hash = Util.CreateHash(folder.Path, ""),
+                    hash = folder.Hash,
                     count = (uint)folder.Children.Count(),
                     offset = 0
                 };
@@ -156,8 +156,8 @@ namespace BSAsharp
             return
                 new FileRecord
                 {
-                    hash = Util.CreateHash(Path.GetFileNameWithoutExtension(file.Name), Path.GetExtension(file.Name)),
-                    size = (uint)file.Size,
+                    hash = file.Hash,
+                    size = file.Size,
                     offset = 0
                 };
         }

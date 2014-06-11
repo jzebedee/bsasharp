@@ -38,6 +38,9 @@ namespace BSAsharp
         }
         public uint OriginalSize { get; private set; }
 
+        private readonly Lazy<ulong> _hash;
+        public ulong Hash { get { return _hash.Value; } }
+
         private byte[] Data { get; set; } //data should be "untouched": deflated for IsCompressed files, raw for !IsCompressed
 
         private readonly bool LeaveOpen;
@@ -62,6 +65,7 @@ namespace BSAsharp
             ReadFileBlock(reader, baseRec.size);
         }
         private BSAFile(string path, string name, FileRecord baseRec, bool defaultCompressed)
+            : this()
         {
             this.Name = name.ToLowerInvariant();
             this.Filename = Path.Combine(path, name);
@@ -72,6 +76,11 @@ namespace BSAsharp
                 baseRec.size ^= FLAG_COMPRESS;
 
             this.IsCompressed = defaultCompressed ^ compressBitSet;
+        }
+
+        private BSAFile()
+        {
+            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)));
         }
 
         public byte[] GetSaveData(bool inflate)

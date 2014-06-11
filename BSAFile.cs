@@ -31,7 +31,7 @@ namespace BSAsharp
             {
                 uint size = (uint)Data.Length;// (uint)GetSaveData(false).Length;
 
-                bool setCompressBit = DefaultCompressed ^ IsCompressed;
+                bool setCompressBit = _settings.DefaultCompressed ^ IsCompressed;
                 if (setCompressBit)
                     size |= FLAG_COMPRESS;
 
@@ -40,64 +40,62 @@ namespace BSAsharp
         }
         public uint OriginalSize { get; private set; }
 
-        private Lazy<ulong> _hash;
+        //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
+        private readonly Lazy<ulong> _hash;
         public ulong Hash { get { return _hash.Value; } }
 
-        private Lazy<byte[]> _data;
-        private byte[] _fixedData;
+        private Lazy<byte[]> _readData;
+        private byte[] _writtenData;
         private byte[] Data
         { //data should be "untouched": deflated for IsCompressed files, raw for !IsCompressed
             get
             {
-                return _fixedData ?? _data.Value;
+                return _writtenData ?? _readData.Value;
             }
             set
             {
-                _fixedData = value;
+                _writtenData = value;
             }
         }
 
-        private readonly bool DefaultCompressed;
+        private readonly ArchiveSettings _settings;
 
-        public BSAFile(string path, string name, byte[] data, bool defaultCompressed, bool inputCompressed, bool compressBit = false)
-            : this(path, name, defaultCompressed)
+        public BSAFile(string path, string name, ArchiveSettings settings, byte[] data, bool inputCompressed, bool compressBit = false)
+            : this(path, name, settings)
         {
             //inputCompressed param specifies compression of data param, NOT final result!
             UpdateData(data, inputCompressed, compressBit);
         }
 
-        internal BSAFile(string path, string name, FileRecord baseRec, BinaryReader reader, bool defaultCompressed)
-            : this(path, name, baseRec, defaultCompressed)
+        internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, BinaryReader reader)
+            : this(path, name, settings, baseRec)
         {
-            _data = new Lazy<byte[]>(() => ReadFileBlock(reader, baseRec.size));
+            _readData = new Lazy<byte[]>(() => ReadFileBlock(reader, baseRec.size));
+            //Trace.Assert(baseRec.hash == Hash);
         }
 
-        private BSAFile(string path, string name, FileRecord baseRec, bool defaultCompressed)
-            : this(path, name, defaultCompressed)
+        private BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec)
+            : this(path, name, settings)
         {
             bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
             if (compressBitSet)
                 baseRec.size ^= FLAG_COMPRESS;
 
-            this.IsCompressed = defaultCompressed ^ compressBitSet;
+            this.IsCompressed = settings.DefaultCompressed ^ compressBitSet;
         }
-        private BSAFile(string path, string name, bool defaultCompressed)
-        {
-            UpdatePath(path, name);
-            this.DefaultCompressed = defaultCompressed;
-        }
-
-        public void UpdatePath(string path, string name)
+        private BSAFile(string path, string name, ArchiveSettings settings)
         {
             this.Name = name.ToLowerInvariant();
             this.Filename = Path.Combine(path, name);
             _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)), true);
+
+            this._settings = settings;
         }
 
         public void UpdateData(byte[] buf, bool inputCompressed, bool compressBit = false)
         {
             this.Data = buf;
-            if (this.IsCompressed = DefaultCompressed ^ compressBit)
+            if (this.IsCompressed = _settings.DefaultCompressed ^ compressBit)
             {
                 this.OriginalSize = (uint)buf.Length;
                 this.Data = GetDeflatedData(!inputCompressed);
@@ -163,11 +161,15 @@ namespace BSAsharp
 
         private byte[] ReadFileBlock(BinaryReader reader, uint size)
         {
-            //if (BStringPrefixed)
-            //{
-            //    throw new NotImplementedException();
-            //    //var name = reader.ReadBString();
-            //}
+            if (_settings.BStringPrefixed)
+            {
+                var length = reader.ReadByte();
+                reader.BaseStream.Seek(length, SeekOrigin.Current);
+                //var name = reader.ReadBString();
+                //var newHash = Util.CreateHash(Path.GetFileNameWithoutExtension(name), Path.GetExtension(name));
+                //Console.WriteLine(newHash == Hash);
+                //Console.WriteLine(name);
+            }
 
             using (reader)
             {

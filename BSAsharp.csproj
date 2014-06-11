@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ArchiveSettings.cs" />
     <Compile Include="BSAFile.cs" />
     <Compile Include="BSAFolder.cs" />
     <Compile Include="HashComparer.cs" />

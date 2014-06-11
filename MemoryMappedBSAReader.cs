@@ -13,12 +13,9 @@ namespace BSAsharp
 {
     internal class MemoryMappedBSAReader : IDisposable
     {
-        public const long TWO_GB_SIZE = 2147483648; //2^31
-
-        protected bool DefaultCompressed { get; set; }
-        //private bool BStringPrefixed { get; set; }
-
         public BSAHeader Header { get; protected set; }
+
+        protected ArchiveSettings Settings { get; private set; }
 
         private readonly MemoryMappedFile _mmf;
 
@@ -72,25 +69,30 @@ namespace BSAsharp
         public IEnumerable<BSAFolder> Read()
         {
             Header = ReadHeader();
-            long offset = BSAWrapper.HEADER_OFFSET;
+            long offset = Header.offset;
 
-            //BStringPrefixed = header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-            DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
-            Trace.Assert(!Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed));
+            var BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            var DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            Settings = new ArchiveSettings(DefaultCompressed, BStringPrefixed);
 
-            var kvpList = ReadFolders(ref offset, Header.folderCount);
+            var folderDict = ReadFolders(ref offset, Header.folderCount);
             var fileNames = ReadFileNameBlocks(ref offset, Header.fileCount);
 
-            return BuildBSALayout(kvpList, fileNames);
+            return BuildBSALayout(folderDict, fileNames);
         }
 
-        protected IEnumerable<BSAFolder> BuildBSALayout(List<KeyValuePair<string, FileRecord>> kvpList, List<string> fileNames)
+        protected IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, List<FileRecord>> folderDict, List<string> fileNames)
         {
-            var pathedFiles = kvpList.Zip(fileNames, (kvp, fn) => Tuple.Create(kvp.Key, fn, kvp.Value));
+            var pathedFiles = folderDict
+                .SelectMany(kvp =>
+                    kvp.Value.Select(record => new { path = kvp.Key, record }))
+                .Zip(fileNames, (a, fn) => Tuple.Create(a.path, fn, a.record));
             var fileLookup = pathedFiles.ToLookup(tup => tup.Item1, tup => Tuple.Create(tup.Item2, tup.Item3));
+
             return
                 from g in fileLookup
-                select new BSAFolder(g.Key, g.Select(tup => new BSAFile(g.Key, tup.Item1, tup.Item2, ReaderFromMMF<byte>(tup.Item2.offset, tup.Item2.size), DefaultCompressed)));
+                let bsaFiles = g.Select(tup => new BSAFile(g.Key, tup.Item1, Settings, tup.Item2, ReaderFromMMF<byte>(tup.Item2.offset, tup.Item2.size)))
+                select new BSAFolder(g.Key, bsaFiles);
         }
 
         protected BSAHeader ReadHeader()
@@ -99,9 +101,9 @@ namespace BSAsharp
                 return Reader.ReadStruct<BSAHeader>();
         }
 
-        protected List<KeyValuePair<string, FileRecord>> ReadFolders(ref long offset, uint folderCount)
+        protected Dictionary<string, List<FileRecord>> ReadFolders(ref long offset, uint folderCount)
         {
-            var kvpList = new List<KeyValuePair<string, FileRecord>>();
+            var folderDict = new Dictionary<string, List<FileRecord>>();
 
             using (var frReader = ReaderFromMMF<FolderRecord>(offset, folderCount))
             {
@@ -113,11 +115,11 @@ namespace BSAsharp
                     string name;
                     var fileRecords = ReadFileRecordBlocks(ref offset, folder.count, out name);
 
-                    kvpList.AddRange(fileRecords.Select(record => new KeyValuePair<string, FileRecord>(name, record)));
+                    folderDict.Add(name, fileRecords);
                 }
             }
 
-            return kvpList;
+            return folderDict;
         }
 
         protected List<FileRecord> ReadFileRecordBlocks(ref long offset, uint count, out string name)

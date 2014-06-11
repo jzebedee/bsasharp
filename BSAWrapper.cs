@@ -15,15 +15,14 @@ namespace BSAsharp
 {
     public class BSAWrapper : SortedSet<BSAFolder>
     {
-        public const int
-            FALLOUT3_VERSION = 0x68,
+        const int
+            FALLOUT_VERSION = 0x68,
             HEADER_OFFSET = 0x24; //Marshal.SizeOf(typeof(BSAHeader))
 
         static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
 
         private readonly BSAHeader _readHeader;
-
-        private readonly bool _defaultCompress;
+        private readonly ArchiveSettings _settings;
 
         private Dictionary<BSAFolder, long> _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
         private Dictionary<BSAFolder, uint> _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
@@ -36,7 +35,7 @@ namespace BSAsharp
         /// </summary>
         /// <param name="bsaPath">The path of the file to open</param>
         public BSAWrapper(string bsaPath)
-            : this(MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open))
+            : this(MemoryMappedFile.CreateFromFile(bsaPath))
         {
         }
         /// <summary>
@@ -44,10 +43,10 @@ namespace BSAsharp
         /// </summary>
         /// <param name="packFolder">The path of the folder to pack</param>
         /// <param name="defaultCompressed">The default compression state for the archive</param>
-        public BSAWrapper(string packFolder, bool defaultCompressed)
+        public BSAWrapper(string packFolder, ArchiveSettings settings)
             : this()
         {
-            this._defaultCompress = defaultCompressed;
+            this._settings = settings;
             Pack(packFolder);
         }
         /// <summary>
@@ -85,7 +84,7 @@ namespace BSAsharp
                     var packFiles = Directory.EnumerateFiles(path);
 
                     var trimmedPath = path.Replace(packFolder, "").TrimStart(Path.DirectorySeparatorChar);
-                    var bsaFiles = packFiles.Select(file => new BSAFile(trimmedPath, Path.GetFileName(file), File.ReadAllBytes(file), _defaultCompress, false));
+                    var bsaFiles = packFiles.Select(file => new BSAFile(trimmedPath, Path.GetFileName(file), _settings, File.ReadAllBytes(file), false));
 
                     return new BSAFolder(trimmedPath, bsaFiles);
                 });
@@ -118,13 +117,13 @@ namespace BSAsharp
             File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles | (_defaultCompress ? ArchiveFlags.Compressed : 0);
+                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles | (_settings.DefaultCompressed ? ArchiveFlags.Compressed : 0);
 
                 var header =
                     (recheck ? null : _readHeader) ?? new BSAHeader
                     {
                         field = BSA_GREET,
-                        version = FALLOUT3_VERSION,
+                        version = FALLOUT_VERSION,
                         offset = HEADER_OFFSET,
                         archiveFlags = archFlags,
                         folderCount = (uint)this.Count(),
@@ -179,13 +178,12 @@ namespace BSAsharp
 
         private FolderRecord CreateFolderRecord(BSAFolder folder)
         {
-            return
-                new FolderRecord
-                {
-                    hash = folder.Hash,
-                    count = (uint)folder.Count(),
-                    offset = 0
-                };
+            return new FolderRecord
+            {
+                hash = folder.Hash,
+                count = (uint)folder.Count(),
+                offset = 0
+            };
         }
 
         private void WriteFolderRecord(BinaryWriter writer, BSAFolder folder, FolderRecord rec)

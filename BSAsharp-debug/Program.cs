@@ -57,7 +57,7 @@ namespace BSAsharp_debug
                 if (inFile != null)
                     wrapper = new BSAWrapper(inFile);
                 else if (packFolder != null)
-                    wrapper = new BSAWrapper(packFolder, true);
+                    wrapper = new BSAWrapper(packFolder, new ArchiveSettings(true, false));
                 Trace.Assert(wrapper != null);
 
                 foreach (var folder in wrapper)

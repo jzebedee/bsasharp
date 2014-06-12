@@ -31,5 +31,10 @@ namespace BSAsharp
             : base(collection, HashComparer.Instance)
         {
         }
+
+        public bool IsParent(BSAFile file)
+        {
+            return Contains(file) && System.IO.Path.Combine(Path, file.Name).Equals(file.Filename);
+        }
     }
 }

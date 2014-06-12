@@ -16,7 +16,7 @@ namespace BSAsharp
     /// <summary>
     /// A managed representation of a BSA file record and its contents. BSAFile is not guaranteed to be valid after the BSAReader that created it is disposed.
     /// </summary>
-    public class BSAFile : IHashed
+    public class BSAFile : IHashed, ICloneable
     {
         const uint FLAG_COMPRESS = 1 << 30;
 
@@ -41,7 +41,8 @@ namespace BSAsharp
         public uint OriginalSize { get; private set; }
 
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
-        private readonly Lazy<ulong> _hash;
+        //private readonly Lazy<ulong> _hash;
+        private Lazy<ulong> _hash; //fuck safety
         public ulong Hash { get { return _hash.Value; } }
 
         private Lazy<byte[]> _readData;
@@ -74,6 +75,19 @@ namespace BSAsharp
             //Trace.Assert(baseRec.hash == Hash);
         }
 
+        //Clone ctor
+        private BSAFile(string fileName, string name, ArchiveSettings settings, Lazy<byte[]> lazyData, byte[] writtenData, bool isCompressed, uint originalSize)
+        {
+            this.Filename = fileName;
+            this.Name = name;
+            UpdateHash();
+
+            this._settings = settings;
+            this._writtenData = writtenData;
+            this._readData = lazyData;
+            this.IsCompressed = isCompressed;
+            this.OriginalSize = originalSize;
+        }
         private BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec)
             : this(path, name, settings)
         {
@@ -85,11 +99,19 @@ namespace BSAsharp
         }
         private BSAFile(string path, string name, ArchiveSettings settings)
         {
-            this.Name = name.ToLowerInvariant();
-            this.Filename = Path.Combine(path, name);
-            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)), true);
-
+            UpdatePath(path, name);
             this._settings = settings;
+        }
+
+        public void UpdatePath(string path, string name)
+        {
+            this.Name = name.ToLowerInvariant();
+            this.Filename = Path.Combine(path.ToLowerInvariant().Replace('/', '\\'), name);
+            UpdateHash();
+        }
+        private void UpdateHash()
+        {
+            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)), true);
         }
 
         public void UpdateData(byte[] buf, bool inputCompressed, bool compressBit = false)
@@ -234,6 +256,16 @@ namespace BSAsharp
 
                 return msCompressed.ToArray();
             }
+        }
+
+        public object Clone()
+        {
+            return new BSAFile(Filename, Name, _settings, _readData, _writtenData, IsCompressed, OriginalSize);
+        }
+        
+        public BSAFile DeepCopy()
+        {
+            return Clone() as BSAFile;
         }
     }
 }

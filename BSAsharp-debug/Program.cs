@@ -48,6 +48,8 @@ namespace BSAsharp_debug
                     }
                 });
 
+            Trace.Assert(packFolder != null ^ inFile != null);
+
             var extractWatch = new Stopwatch();
             try
             {

@@ -34,6 +34,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>packages\SharpZipLib.0.86.0\lib\20\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -43,17 +46,24 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ArchiveSettings.cs" />
     <Compile Include="BSAFile.cs" />
     <Compile Include="BSAFolder.cs" />
-    <Compile Include="BSAReader.cs" />
-    <Compile Include="Extensions.cs" />
+    <Compile Include="HashComparer.cs" />
+    <Compile Include="BSAWrapper.cs" />
+    <Compile Include="Extensions\Extensions.cs" />
+    <Compile Include="Extensions\Util.cs" />
     <Compile Include="Format\ArchiveFlags.cs" />
     <Compile Include="Format\BSAHeader.cs" />
     <Compile Include="Format\FileFlags.cs" />
     <Compile Include="Format\FileRecord.cs" />
     <Compile Include="Format\FolderRecord.cs" />
+    <Compile Include="IHashed.cs" />
     <Compile Include="MemoryMappedBSAReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

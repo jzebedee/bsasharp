@@ -8,17 +8,16 @@ namespace BSAsharp.Format
     [Flags]
     public enum ArchiveFlags
     {
-        NamedDirectories = 0x1,
-        NamedFiles = 0x2,
-        Compressed = 0x4,
-        unk1 = 0x8,
-        unk2 = 0x10,
-        //0x20
-        //0x40
-        //0x80
-        unk3 = 0x100,
-        BStringPrefixed = 0x200,
-        unk5 = 0x400,
-        unk6 = 0x800
+        NamedDirectories = 1 << 0,
+        NamedFiles = 1 << 1,
+        Compressed = 1 << 2,
+        unk1 = 1 << 3,
+        unk2 = 1 << 4,
+        unk3 = 1 << 5,
+        unk4 = 1 << 6,
+        unk5 = 1 << 7,
+        BStringPrefixed = 1 << 8,
+        unk6 = 1 << 9,
+        unk7 = 1 << 10
     }
 }

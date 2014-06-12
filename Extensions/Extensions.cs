@@ -5,11 +5,11 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace BSAsharp
+namespace BSAsharp.Extensions
 {
     public static class Extensions
     {
-        static readonly Encoding Windows1252 = Encoding.GetEncoding("Windows-1252");
+        public static readonly Encoding Windows1252 = Encoding.GetEncoding("Windows-1252");
 
         public static T ReadStruct<T>(this BinaryReader reader, int? Size = null)// where T : struct
         {
@@ -18,16 +18,38 @@ namespace BSAsharp
             if (readBytes.Length != structSize)
                 throw new ArgumentException("Size of bytes read did not match struct size");
 
-            return readBytes.MarshalStruct<T>();
+            return readBytes.MarshalStruct<T>(length: structSize);
+        }
+
+        public static IEnumerable<T> ReadBulkStruct<T>(this BinaryReader reader, int Count, int? Size = null)// where T : struct
+        {
+            int structSize = Size ?? Marshal.SizeOf(typeof(T));
+            int bulkLength = structSize * Count;
+
+            byte[] readBytes = reader.ReadBytes(bulkLength);
+            if (readBytes.Length != bulkLength)
+                throw new ArgumentException("Size of bytes read did not match expected size");
+
+            for (int i = 0; i < Count; i++)
+                yield return readBytes.MarshalStruct<T>(i * structSize, structSize);
         }
 
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();
+
             var bytes = reader.ReadBytes(length);
             var bstring = Windows1252.GetString(bytes);
 
             return stripEnd ? bstring.TrimEnd('\0') : bstring;
+        }
+
+        public static void WriteBString(this BinaryWriter writer, string toWrite)
+        {
+            var bytes = Windows1252.GetBytes(toWrite + '\0');
+
+            writer.Write((byte)bytes.Length);
+            writer.Write(bytes);
         }
 
         public static string ReadCString(this BinaryReader reader)
@@ -38,6 +60,12 @@ namespace BSAsharp
             while ((cur = reader.ReadByte()) != '\0') builder.Append((char)cur);
 
             return builder.ToString();
+        }
+
+        public static void WriteCString(this BinaryWriter writer, string toWrite)
+        {
+            var bytes = Windows1252.GetBytes(toWrite + '\0');
+            writer.Write(bytes);
         }
 
         //public static async Task<T> ReadStructAsync<T>(this BinaryReader reader, int? Size = null) where T : struct

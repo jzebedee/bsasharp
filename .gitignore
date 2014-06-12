@@ -5,10 +5,10 @@
 *.suo
 *.user
 /bin/Debug
+/bin/Release
 /obj/Debug
 /obj/Release
-/bin/Release
 /BSAsharp-debug/bin/Debug
+/BSAsharp-debug/bin/Release
 /BSAsharp-debug/obj/Debug
 /BSAsharp-debug/obj/Release
-/BSAsharp-debug/bin/Release

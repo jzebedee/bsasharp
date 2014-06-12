@@ -64,7 +64,7 @@ namespace BSAsharp_debug
 
                 foreach (var folder in wrapper)
                 {
-                    Console.WriteLine(folder.Path);
+                    Console.WriteLine(folder);
                     foreach (var file in folder)
                     {
                         Console.Write('\t');

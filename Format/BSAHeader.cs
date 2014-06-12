@@ -19,15 +19,24 @@ namespace BSAsharp.Format
     [StructLayout(LayoutKind.Sequential)]
     public class BSAHeader
     {
+        //0h
         [MarshalAs(UnmanagedType.ByValArray, /*ArraySubType = UnmanagedType.U1,*/ SizeConst = 4)]
         public char[] field;
+        //4h
         public uint version;
+        //8h
         public uint offset;
+        //Ch
         public ArchiveFlags archiveFlags;
+        //10h
         public uint folderCount;
+        //14h
         public uint fileCount;
+        //18h
         public uint totalFolderNameLength;
+        //1Ch
         public uint totalFileNameLength;
+        //20h
         public FileFlags fileFlags;
     }
 }

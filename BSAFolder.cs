@@ -1,4 +1,5 @@
 ﻿using BSAsharp.Extensions;
+using BSAsharp.Format;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,6 +13,7 @@ namespace BSAsharp
     /// <summary>
     /// A managed representation of a BSA folder.
     /// </summary>
+    [DebuggerDisplay("{Path} ({Count})")]
     public class BSAFolder : SortedSet<BSAFile>, IHashed
     {
         public string Path { get; private set; }
@@ -20,16 +22,20 @@ namespace BSAsharp
         public ulong Hash { get { return _hash.Value; } }
 
         public BSAFolder(string path, IEnumerable<BSAFile> children = null)
-            : this(children ?? new SortedSet<BSAFile>())
+            : this(children)
         {
             //Must be all lower case, and use backslash as directory delimiter
-            this.Path = path.ToLowerInvariant().Replace('/', '\\');
+            this.Path = BSAFile.FixPath(path);
             this._hash = new Lazy<ulong>(() => Util.CreateHash(Path, ""), true);
         }
-
         private BSAFolder(IEnumerable<BSAFile> collection)
             : base(collection, HashComparer.Instance)
         {
+        }
+
+        public override string ToString()
+        {
+            return Path;
         }
 
         public bool IsParent(BSAFile file)

@@ -15,7 +15,7 @@ namespace BSAsharp
 {
     public class BSAWrapper : SortedSet<BSAFolder>
     {
-        const int
+        public const int
             FALLOUT_VERSION = 0x68,
             HEADER_OFFSET = 0x24; //Marshal.SizeOf(typeof(BSAHeader))
 
@@ -23,11 +23,11 @@ namespace BSAsharp
 
         private readonly BSAHeader _readHeader;
 
-        private Dictionary<BSAFolder, long> _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
-        private Dictionary<BSAFolder, uint> _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
+        private Dictionary<BSAFolder, long> _folderRecordOffsetsA;
+        private Dictionary<BSAFolder, uint> _folderRecordOffsetsB;
 
-        private Dictionary<BSAFile, long> _fileRecordOffsetsA = new Dictionary<BSAFile, long>();
-        private Dictionary<BSAFile, uint> _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
+        private Dictionary<BSAFile, long> _fileRecordOffsetsA;
+        private Dictionary<BSAFile, uint> _fileRecordOffsetsB;
 
         public ArchiveSettings Settings { get; private set; }
 
@@ -112,28 +112,36 @@ namespace BSAsharp
             }
         }
 
-        public void Save(string outBsa, bool recheck = true)
+        public void Save(string outBsa)
         {
+            _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
+            _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
+
+            _fileRecordOffsetsA = new Dictionary<BSAFile, long>();
+            _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
+
             var allFileNames = this.SelectMany(fold => fold).Select(file => file.Name);
 
             File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                var archFlags = _readHeader != null ? _readHeader.archiveFlags : ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles | (Settings.DefaultCompressed ? ArchiveFlags.Compressed : 0);
+                var archFlags = _readHeader != null ? _readHeader.archiveFlags :
+                    ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles
+                    | (Settings.DefaultCompressed ? ArchiveFlags.Compressed : 0)
+                    | (Settings.BStringPrefixed ? ArchiveFlags.BStringPrefixed : 0);
 
-                var header =
-                    (recheck ? null : _readHeader) ?? new BSAHeader
-                    {
-                        field = BSA_GREET,
-                        version = FALLOUT_VERSION,
-                        offset = HEADER_OFFSET,
-                        archiveFlags = archFlags,
-                        folderCount = (uint)this.Count(),
-                        fileCount = (uint)allFileNames.Count(),
-                        totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
-                        totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
-                        fileFlags = CreateFileFlags(allFileNames)
-                    };
+                var header = new BSAHeader
+                {
+                    field = BSA_GREET,
+                    version = FALLOUT_VERSION,
+                    offset = HEADER_OFFSET,
+                    archiveFlags = archFlags,
+                    folderCount = (uint)this.Count(),
+                    fileCount = (uint)allFileNames.Count(),
+                    totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
+                    totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
+                    fileFlags = CreateFileFlags(allFileNames) //doesn't preserve original flags
+                };
 
                 writer.WriteStruct<BSAHeader>(header);
 
@@ -149,7 +157,7 @@ namespace BSAsharp
                 //MUST execute this
                 var fullyOrdered =
                     orderedFolders
-                    .Select(a => CreateWriteFileRecordBlock(writer, a.folder)).ToList();
+                    .Select(a => CreateWriteFileRecordBlock(writer, a.folder, header.totalFileNameLength)).ToList();
 
                 allFileNames.ToList()
                     .ForEach(fileName => writer.WriteCString(fileName));
@@ -198,19 +206,18 @@ namespace BSAsharp
 
         private FileRecord CreateFileRecord(BSAFile file)
         {
-            return
-                new FileRecord
-                {
-                    hash = file.Hash,
-                    size = file.Size,
-                    offset = 0
-                };
+            return new FileRecord
+            {
+                hash = file.Hash,
+                size = file.Size,
+                offset = 0
+            };
         }
 
-        private IEnumerable<BSAFile> CreateWriteFileRecordBlock(BinaryWriter writer, BSAFolder folder)
+        private IEnumerable<BSAFile> CreateWriteFileRecordBlock(BinaryWriter writer, BSAFolder folder, uint totalFileNameLength)
         {
             long offset = writer.BaseStream.Position;
-            _folderRecordOffsetsB.Add(folder, (uint)offset);
+            _folderRecordOffsetsB.Add(folder, (uint)offset + totalFileNameLength);
 
             writer.WriteBString(folder.Path);
 
@@ -247,9 +254,9 @@ namespace BSAsharp
             if (extSet.Contains(".WAV"))
                 flags |= FileFlags.Wav;
             if (extSet.Contains(".MP3") || extSet.Contains(".OGG"))
-                flags |= FileFlags.Snd;
+                flags |= FileFlags.Ogg;
             if (extSet.Contains(".TXT") || extSet.Contains(".HTML") || extSet.Contains(".BAT") || extSet.Contains(".SCC"))
-                flags |= FileFlags.Doc;
+                flags |= FileFlags.Txt;
             if (extSet.Contains(".SPT"))
                 flags |= FileFlags.Spt;
             if (extSet.Contains(".TEX") || extSet.Contains(".FNT"))

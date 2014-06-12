@@ -100,7 +100,7 @@ namespace BSAsharp.Extensions
 
             var newLength = (length < 0 ? buf.Length - offset : length);
             var newBuf = new byte[newLength];
-            Array.Copy(buf, offset, newBuf, 0, newLength);
+            Buffer.BlockCopy(buf, offset, newBuf, 0, length);
 
             return newBuf;
         }

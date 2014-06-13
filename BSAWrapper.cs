@@ -115,8 +115,10 @@ namespace BSAsharp
             }
         }
 
-        public void Save(string outBsa)
+        public void Save(string outBsa, bool recreate = false)
         {
+            bool reuseAttributes = _readHeader != null && !recreate;
+
             _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>();
             _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
 
@@ -129,7 +131,7 @@ namespace BSAsharp
             File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
             {
-                var archFlags = _readHeader != null ? _readHeader.archiveFlags :
+                var archFlags = reuseAttributes ? _readHeader.archiveFlags :
                     ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles
                     | (Settings.DefaultCompressed ? ArchiveFlags.Compressed : 0)
                     | (Settings.BStringPrefixed ? ArchiveFlags.BStringPrefixed : 0);
@@ -144,7 +146,7 @@ namespace BSAsharp
                     fileCount = (uint)allFileNames.Count,
                     totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
                     totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
-                    fileFlags = CreateFileFlags(allFileNames) //doesn't preserve original flags
+                    fileFlags = reuseAttributes ? _readHeader.fileFlags : CreateFileFlags(allFileNames)
                 };
 
                 writer.WriteStruct<BSAHeader>(header);
@@ -248,7 +250,7 @@ namespace BSAsharp
                 flags |= FileFlags.Spt;
             if (extSet.Contains(".TEX") || extSet.Contains(".FNT"))
                 flags |= FileFlags.Tex;
-            if (extSet.Contains(".CTL"))
+            if (extSet.Contains(".CTL") || extSet.Contains(".DLODSETTINGS")) //https://github.com/Ethatron/bsaopt/issues/13
                 flags |= FileFlags.Ctl;
 
             return flags;

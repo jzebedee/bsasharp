@@ -21,6 +21,10 @@ namespace BSAsharp
         const uint FLAG_COMPRESS = 1 << 30;
         const int DEFLATE_LEVEL = 9;
 
+        //static readonly HashSet<string> ForcedNoCompress = new HashSet<string>(new[] {
+        //    ".dlodsettings", ".ogg", ".mp3"
+        //});
+
         public string Name { get; private set; }
         public string Filename { get; private set; }
 
@@ -79,7 +83,8 @@ namespace BSAsharp
         }
 
         //Clone ctor
-        private BSAFile(string path, string name, ArchiveSettings settings, Lazy<byte[]> lazyData, byte[] writtenData, bool isCompressed, uint originalSize) : this()
+        private BSAFile(string path, string name, ArchiveSettings settings, Lazy<byte[]> lazyData, byte[] writtenData, bool isCompressed, uint originalSize)
+            : this()
         {
             this.Filename = Path.Combine(path, name);
             this.Name = name;
@@ -97,9 +102,10 @@ namespace BSAsharp
             if (compressBitSet)
                 baseRec.size ^= FLAG_COMPRESS;
 
-            this.IsCompressed = settings.DefaultCompressed ^ compressBitSet;
+            this.IsCompressed = CheckCompressed(compressBitSet);
         }
-        private BSAFile(string path, string name, ArchiveSettings settings) : this()
+        private BSAFile(string path, string name, ArchiveSettings settings)
+            : this()
         {
             this.Name = FixName(name);
             this.Filename = Path.Combine(FixPath(path), name);
@@ -130,10 +136,17 @@ namespace BSAsharp
             return Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name));
         }
 
+        private bool CheckCompressed(bool compressBitSet)
+        {
+            //if (ForcedNoCompress.Contains(Path.GetExtension(Name)))
+            //    return false;
+            return _settings.DefaultCompressed ^ compressBitSet;
+        }
+
         public void UpdateData(byte[] buf, bool inputCompressed, bool compressBit = false)
         {
             this.Data = buf;
-            if (this.IsCompressed = _settings.DefaultCompressed ^ compressBit)
+            if (this.IsCompressed = CheckCompressed(compressBit))
             {
                 this.OriginalSize = (uint)buf.Length;
                 this.Data = GetDeflatedData(!inputCompressed);

@@ -29,7 +29,7 @@ namespace BSAsharp
             this._hash = new Lazy<ulong>(() => Util.CreateHash(Path, ""), true);
         }
         private BSAFolder(IEnumerable<BSAFile> collection)
-            : base(collection, HashComparer.Instance)
+            : base(collection ?? new SortedSet<BSAFile>(), HashComparer.Instance)
         {
         }
 

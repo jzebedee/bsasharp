@@ -10,6 +10,7 @@ using BSAsharp.Extensions;
 using System.Threading;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Diagnostics;
 
 namespace BSAsharp
 {
@@ -17,16 +18,18 @@ namespace BSAsharp
     {
         public const int
             FALLOUT_VERSION = 0x68,
-            HEADER_OFFSET = 0x24; //Marshal.SizeOf(typeof(BSAHeader))
+            HEADER_OFFSET = 0x24, //sizeof(BSAHeader)
+            SIZE_RECORD = 0x10, //sizeof(FolderRecord) or sizeof(FileRecord)
+            SIZE_RECORD_OFFSET = 0xC; //SIZE_RECORD - sizeof(uint)
 
         static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
 
         private readonly BSAHeader _readHeader;
 
-        private Dictionary<BSAFolder, long> _folderRecordOffsetsA;
+        private Dictionary<BSAFolder, uint> _folderRecordOffsetsA;
         private Dictionary<BSAFolder, uint> _folderRecordOffsetsB;
 
-        private Dictionary<BSAFile, long> _fileRecordOffsetsA;
+        private Dictionary<BSAFile, uint> _fileRecordOffsetsA;
         private Dictionary<BSAFile, uint> _fileRecordOffsetsB;
 
         public ArchiveSettings Settings { get; private set; }
@@ -114,13 +117,14 @@ namespace BSAsharp
 
         public void Save(string outBsa)
         {
-            _folderRecordOffsetsA = new Dictionary<BSAFolder, long>();
+            _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>();
             _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
 
-            _fileRecordOffsetsA = new Dictionary<BSAFile, long>();
+            _fileRecordOffsetsA = new Dictionary<BSAFile, uint>();
             _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
 
-            var allFileNames = this.SelectMany(fold => fold).Select(file => file.Name);
+            var allFiles = this.SelectMany(fold => fold);
+            var allFileNames = allFiles.Select(file => file.Name).ToList();
 
             File.Delete(outBsa);
             using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
@@ -137,7 +141,7 @@ namespace BSAsharp
                     offset = HEADER_OFFSET,
                     archiveFlags = archFlags,
                     folderCount = (uint)this.Count(),
-                    fileCount = (uint)allFileNames.Count(),
+                    fileCount = (uint)allFileNames.Count,
                     totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
                     totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
                     fileFlags = CreateFileFlags(allFileNames) //doesn't preserve original flags
@@ -149,32 +153,23 @@ namespace BSAsharp
                     (from folder in this //presorted
                      let record = CreateFolderRecord(folder)
                      //orderby record.hash
-                     select new { folder, record });
+                     select new { folder, record }).ToList();
 
-                orderedFolders.ToList()
-                    .ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
+                orderedFolders.ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
 
-                //MUST execute this
-                var fullyOrdered =
-                    orderedFolders
-                    .Select(a => CreateWriteFileRecordBlock(writer, a.folder, header.totalFileNameLength)).ToList();
+                orderedFolders.ForEach(a => WriteFileRecordBlock(writer, a.folder, header.totalFileNameLength));
 
-                allFileNames.ToList()
-                    .ForEach(fileName => writer.WriteCString(fileName));
+                allFileNames.ForEach(fileName => writer.WriteCString(fileName));
 
-                (from folder in fullyOrdered
-                 from file in folder
-                 select file).ToList()
-                 .ForEach(file =>
-                 {
-                     long offset = writer.BaseStream.Position;
-                     _fileRecordOffsetsB.Add(file, (uint)offset);
+                allFiles.ToList()
+                    .ForEach(file =>
+                    {
+                        _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
+                        writer.Write(file.GetSaveData(false));
+                    });
 
-                     writer.Write(file.GetSaveData(false));
-                 });
-
-                var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<long, uint>(kvpA.Value, kvpB.Value));
-                var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<long, uint>(kvpA.Value, kvpB.Value));
+                var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
+                var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
                 var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets);
 
                 completeOffsets.ToList()
@@ -198,9 +193,7 @@ namespace BSAsharp
 
         private void WriteFolderRecord(BinaryWriter writer, BSAFolder folder, FolderRecord rec)
         {
-            long offset = writer.BaseStream.Position + Marshal.SizeOf(typeof(FolderRecord)) - sizeof(uint);
-            _folderRecordOffsetsA.Add(folder, offset);
-
+            _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
             writer.WriteStruct(rec);
         }
 
@@ -214,12 +207,10 @@ namespace BSAsharp
             };
         }
 
-        private IEnumerable<BSAFile> CreateWriteFileRecordBlock(BinaryWriter writer, BSAFolder folder, uint totalFileNameLength)
+        private void WriteFileRecordBlock(BinaryWriter writer, BSAFolder folder, uint totalFileNameLength)
         {
-            long offset = writer.BaseStream.Position;
-            _folderRecordOffsetsB.Add(folder, (uint)offset + totalFileNameLength);
-
-            writer.WriteBString(folder.Path);
+            _folderRecordOffsetsB.Add(folder, (uint)writer.BaseStream.Position + totalFileNameLength);
+            writer.WriteBZString(folder.Path);
 
             var sortedKids = (from file in folder
                               let record = CreateFileRecord(file)
@@ -228,13 +219,9 @@ namespace BSAsharp
 
             sortedKids.ForEach(a =>
             {
-                offset = writer.BaseStream.Position + Marshal.SizeOf(typeof(FileRecord)) - sizeof(uint);
-                _fileRecordOffsetsA.Add(a.file, offset);
-
+                _fileRecordOffsetsA.Add(a.file, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
                 writer.WriteStruct(a.record);
             });
-
-            return sortedKids.Select(a => a.file);
         }
 
         private FileFlags CreateFileFlags(IEnumerable<string> allFiles)

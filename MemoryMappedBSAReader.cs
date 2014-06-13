@@ -108,14 +108,21 @@ namespace BSAsharp
 
                     var fileOffset = tup.Item2.offset;
 
-                    var size = fileRec.size;
                     if (Settings.BStringPrefixed)
                         using (var lengthReader = ReaderFromMMF<byte>(fileOffset))
-                            size += lengthReader.ReadByte() + 1u;
+                        {
+                            var bstringLen = lengthReader.ReadByte() + 1u;
+                            if (bstringLen != 1)
+                            {
+                                fileOffset += bstringLen;
+                                if (fileRec.size > bstringLen)
+                                    fileRec.size -= bstringLen;
+                            }
+                        }
 
-                    var reader = ReaderFromMMF<byte>(fileOffset, size);
+                    var fileReader = ReaderFromMMF<byte>(fileOffset, fileRec.size);
 
-                    return new BSAFile(path, name, Settings, fileRec, reader);
+                    return new BSAFile(path, name, Settings, fileRec, fileReader);
                 })
                 select new BSAFolder(g.Key, bsaFiles);
         }
@@ -127,6 +134,9 @@ namespace BSAsharp
             var folders = _reader.ReadBulkStruct<FolderRecord>((int)folderCount);
             foreach (var folder in folders)
             {
+                var folderOffset = folder.offset - Header.totalFileNameLength;
+                Trace.Assert(_reader.BaseStream.Position == folderOffset);
+
                 string folderName;
                 var fileRecords = ReadFileRecordBlocks(folder.count, out folderName);
 

@@ -33,6 +33,8 @@ namespace BSAsharp
                 uint size = (uint)Data.Length;
                 if (IsCompressed)
                     size += sizeof(uint);
+                if (_settings.BStringPrefixed)
+                    size += (uint)Filename.Length + 1;
 
                 bool setCompressBit = _settings.DefaultCompressed ^ IsCompressed;
                 if (setCompressBit)
@@ -44,7 +46,6 @@ namespace BSAsharp
         public uint OriginalSize { get; private set; }
 
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
-        //private readonly Lazy<ulong> _hash;
         private readonly Lazy<ulong> _hash;
         public ulong Hash { get { return _hash.Value; } }
 
@@ -192,12 +193,6 @@ namespace BSAsharp
 
         private byte[] ReadFileBlock(BinaryReader reader, uint size)
         {
-            if (_settings.BStringPrefixed)
-            {
-                var length = reader.ReadByte();
-                reader.BaseStream.Seek(length, SeekOrigin.Current);
-            }
-
             using (reader)
             {
                 if (size == 0 || (size <= 4 && IsCompressed))
@@ -270,11 +265,7 @@ namespace BSAsharp
 
         public BSAFile DeepCopy(string newPath = null, string newName = null)
         {
-            if (newName != null)
-                this.Name = FixName(newName);
-            if (newPath != null)
-                this.Filename = Path.Combine(FixPath(newPath), Name);
-            return Clone() as BSAFile;
+            return new BSAFile(Path.Combine(FixPath(newPath), Name), FixName(newName), _settings, _readData, _writtenData, IsCompressed, OriginalSize);
         }
     }
 }

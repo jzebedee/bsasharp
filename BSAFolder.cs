@@ -26,7 +26,7 @@ namespace BSAsharp
         {
             //Must be all lower case, and use backslash as directory delimiter
             this.Path = BSAFile.FixPath(path);
-            this._hash = new Lazy<ulong>(() => Util.CreateHash(Path, ""), true);
+            this._hash = new Lazy<ulong>(() => Util.CreateHash(Path, ""));
         }
         private BSAFolder(IEnumerable<BSAFile> collection)
             : base(collection ?? new SortedSet<BSAFile>(), HashComparer.Instance)

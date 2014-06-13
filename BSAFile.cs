@@ -79,11 +79,10 @@ namespace BSAsharp
         }
 
         //Clone ctor
-        private BSAFile(string fileName, string name, ArchiveSettings settings, Lazy<byte[]> lazyData, byte[] writtenData, bool isCompressed, uint originalSize)
+        private BSAFile(string path, string name, ArchiveSettings settings, Lazy<byte[]> lazyData, byte[] writtenData, bool isCompressed, uint originalSize) : this()
         {
-            this.Filename = fileName;
+            this.Filename = Path.Combine(path, name);
             this.Name = name;
-            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)), true);
 
             this._settings = settings;
             this._writtenData = writtenData;
@@ -100,12 +99,15 @@ namespace BSAsharp
 
             this.IsCompressed = settings.DefaultCompressed ^ compressBitSet;
         }
-        private BSAFile(string path, string name, ArchiveSettings settings)
+        private BSAFile(string path, string name, ArchiveSettings settings) : this()
         {
             this.Name = FixName(name);
             this.Filename = Path.Combine(FixPath(path), name);
-            _hash = new Lazy<ulong>(() => Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name)), true);
             this._settings = settings;
+        }
+        private BSAFile()
+        {
+            _hash = new Lazy<ulong>(MakeHash);
         }
 
         public override string ToString()
@@ -121,6 +123,11 @@ namespace BSAsharp
         public static string FixPath(string path)
         {
             return path.ToLowerInvariant().Replace('/', '\\');
+        }
+
+        private ulong MakeHash()
+        {
+            return Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name));
         }
 
         public void UpdateData(byte[] buf, bool inputCompressed, bool compressBit = false)
@@ -265,7 +272,7 @@ namespace BSAsharp
 
         public BSAFile DeepCopy(string newPath = null, string newName = null)
         {
-            return new BSAFile(Path.Combine(FixPath(newPath), Name), FixName(newName), _settings, _readData, _writtenData, IsCompressed, OriginalSize);
+            return new BSAFile(FixPath(newPath), FixName(newName), _settings, _readData, _writtenData, IsCompressed, OriginalSize);
         }
     }
 }

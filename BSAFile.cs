@@ -76,10 +76,10 @@ namespace BSAsharp
             UpdateData(data, inputCompressed, compressBit);
         }
 
-        internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, BinaryReader reader)
+        internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<BinaryReader> createReader)
             : this(path, name, settings, baseRec)
         {
-            _readData = new Lazy<byte[]>(() => ReadFileBlock(reader, baseRec.size));
+            _readData = new Lazy<byte[]>(() => ReadFileBlock(createReader(), baseRec.size));
         }
 
         //Clone ctor

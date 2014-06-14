@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace BSAsharp
 {
-    public class BSAWrapper : SortedSet<BSAFolder>
+    public class BSAWrapper : SortedSet<BSAFolder>, IDisposable
     {
         public const int
             FALLOUT_VERSION = 0x68,
@@ -66,18 +66,42 @@ namespace BSAsharp
         private BSAWrapper(MemoryMappedFile BSAMap)
             : this(new MemoryMappedBSAReader(BSAMap))
         {
-            BSAMap.Dispose();
+            this._bsaMap = BSAMap;
         }
         private BSAWrapper(MemoryMappedBSAReader BSAReader)
             : this(BSAReader.Read())
         {
             this._readHeader = BSAReader.Header;
             this.Settings = BSAReader.Settings;
-            BSAReader.Dispose();
+
+            this._bsaReader = BSAReader;
         }
         private BSAWrapper(IEnumerable<BSAFolder> collection)
             : base(collection, HashComparer.Instance)
         {
+        }
+        ~BSAWrapper()
+        {
+            Dispose(false);
+        }
+
+        private readonly MemoryMappedBSAReader _bsaReader;
+        private readonly MemoryMappedFile _bsaMap;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_bsaReader != null)
+                    _bsaReader.Dispose();
+                if (_bsaMap != null)
+                    _bsaMap.Dispose();
+            }
+        }
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         public void Pack(string packFolder)

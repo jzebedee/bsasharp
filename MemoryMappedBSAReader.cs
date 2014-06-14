@@ -75,7 +75,9 @@ namespace BSAsharp
 
         public IEnumerable<BSAFolder> Read()
         {
-            using (_reader = ReaderFromMMF(0, 0))
+            //using (
+                _reader = ReaderFromMMF(0, 0);
+                //)
             {
                 Header = _reader.ReadStruct<BSAHeader>();
 
@@ -120,9 +122,7 @@ namespace BSAsharp
                             }
                         }
 
-                    var fileReader = ReaderFromMMF<byte>(fileOffset, fileRec.size);
-
-                    return new BSAFile(path, name, Settings, fileRec, fileReader);
+                    return new BSAFile(path, name, Settings, fileRec, () => ReaderFromMMF<byte>(fileOffset, fileRec.size));
                 })
                 select new BSAFolder(g.Key, bsaFiles);
         }

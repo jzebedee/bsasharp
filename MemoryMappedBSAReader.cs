@@ -19,8 +19,6 @@ namespace BSAsharp
 
         private readonly MemoryMappedFile _mmf;
 
-        private BinaryReader _reader;
-
         public MemoryMappedBSAReader(MemoryMappedFile mmf)
         {
             this._mmf = mmf;
@@ -73,23 +71,30 @@ namespace BSAsharp
             return new BinaryReader(FromMMF(offset, size));
         }
 
+        private uint GetBStringOffset(long offset)
+        {
+            using (var lengthReader = ReaderFromMMF<byte>(offset))
+            {
+                return lengthReader.ReadByte() + 1u;
+            }
+        }
+
         public IEnumerable<BSAFolder> Read()
         {
-            //using (
-                _reader = ReaderFromMMF(0, 0);
-                //)
+            using (var reader = ReaderFromMMF<BSAHeader>(0))
             {
-                Header = _reader.ReadStruct<BSAHeader>();
-
-                var BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-                var DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
-                Settings = new ArchiveSettings(DefaultCompressed, BStringPrefixed);
-
-                var folderDict = ReadFolders(Header.folderCount);
-                var fileNames = ReadFileNameBlocks(Header.fileCount);
-
-                return BuildBSALayout(folderDict, fileNames);
+                Header = reader.ReadStruct<BSAHeader>();
             }
+
+            var BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            var DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            Settings = new ArchiveSettings(DefaultCompressed, BStringPrefixed);
+
+            long offset = BSAWrapper.HEADER_OFFSET;
+            var folderDict = ReadFolders(ref offset, Header.folderCount);
+            var fileNames = ReadFileNameBlocks(offset, Header.fileCount);
+
+            return BuildBSALayout(folderDict, fileNames);
         }
 
         protected IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, IEnumerable<FileRecord>> folderDict, List<string> fileNames)
@@ -111,53 +116,65 @@ namespace BSAsharp
                     var fileOffset = tup.Item2.offset;
 
                     if (Settings.BStringPrefixed)
-                        using (var lengthReader = ReaderFromMMF<byte>(fileOffset))
+                    {
+                        var bstringLen = GetBStringOffset(fileOffset);
+                        if (bstringLen != 1)
                         {
-                            var bstringLen = lengthReader.ReadByte() + 1u;
-                            if (bstringLen != 1)
-                            {
-                                fileOffset += bstringLen;
-                                if (fileRec.size > bstringLen)
-                                    fileRec.size -= bstringLen;
-                            }
+                            fileOffset += bstringLen;
+                            if (fileRec.size > bstringLen)
+                                fileRec.size -= bstringLen;
                         }
+                    }
 
                     return new BSAFile(path, name, Settings, fileRec, () => ReaderFromMMF<byte>(fileOffset, fileRec.size));
                 })
                 select new BSAFolder(g.Key, bsaFiles);
         }
 
-        protected Dictionary<string, IEnumerable<FileRecord>> ReadFolders(uint folderCount)
+        protected Dictionary<string, IEnumerable<FileRecord>> ReadFolders(ref long offset, uint folderCount)
         {
             var folderDict = new Dictionary<string, IEnumerable<FileRecord>>();
 
-            var folders = _reader.ReadBulkStruct<FolderRecord>((int)folderCount);
-            foreach (var folder in folders)
+            using (var reader = ReaderFromMMF<FolderRecord>(offset, folderCount))
             {
-                var folderOffset = folder.offset - Header.totalFileNameLength;
-                Trace.Assert(_reader.BaseStream.Position == folderOffset);
+                var folders = reader.ReadBulkStruct<FolderRecord>((int)folderCount);
+                foreach (var folder in folders)
+                {
+                    //var folderOffset = folder.offset - Header.totalFileNameLength;
+                    offset = folder.offset - Header.totalFileNameLength;
 
-                string folderName;
-                var fileRecords = ReadFileRecordBlocks(folder.count, out folderName);
+                    string folderName;
+                    var fileRecords = ReadFileRecordBlocks(ref offset, folder.count, out folderName);
 
-                folderDict.Add(folderName, fileRecords);
+                    folderDict.Add(folderName, fileRecords);
+                }
             }
 
             return folderDict;
         }
 
-        protected IEnumerable<FileRecord> ReadFileRecordBlocks(uint count, out string folderName)
+        protected IEnumerable<FileRecord> ReadFileRecordBlocks(ref long offset, uint count, out string folderName)
         {
-            folderName = _reader.ReadBString(true);
-            return _reader.ReadBulkStruct<FileRecord>((int)count).ToList();
+            var bstringLen = GetBStringOffset(offset);
+            using (var nameReader = ReaderFromMMF(offset, bstringLen))
+                folderName = nameReader.ReadBString(true);
+            offset += bstringLen;
+
+            List<FileRecord> records;
+            using (var recordReader = ReaderFromMMF<FileRecord>(offset, count))
+                records = recordReader.ReadBulkStruct<FileRecord>((int)count).ToList();
+            offset += BSAWrapper.SIZE_RECORD * count;
+
+            return records;
         }
 
-        protected List<string> ReadFileNameBlocks(uint count)
+        protected List<string> ReadFileNameBlocks(long offset, uint count)
         {
             var fileNames = new List<string>((int)count);
 
-            for (int i = 0; i < count; i++)
-                fileNames.Add(_reader.ReadCString());
+            using (var reader = ReaderFromMMF(offset, Header.totalFileNameLength))
+                for (int i = 0; i < count; i++)
+                    fileNames.Add(reader.ReadCString());
 
             return fileNames;
         }

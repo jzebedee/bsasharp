@@ -50,10 +50,10 @@ namespace BSAsharp_debug
 
             Trace.Assert(packFolder != null ^ inFile != null);
 
-            var extractWatch = new Stopwatch();
+            var watch = new Stopwatch();
             try
             {
-                extractWatch.Start();
+                watch.Start();
 
                 BSAWrapper wrapper = null;
                 if (inFile != null)
@@ -62,29 +62,32 @@ namespace BSAsharp_debug
                     wrapper = new BSAWrapper(packFolder, new ArchiveSettings(true, false));
                 Trace.Assert(wrapper != null);
 
-                foreach (var folder in wrapper)
+                using (wrapper)
                 {
-                    Console.WriteLine(folder);
-                    foreach (var file in folder)
+                    foreach (var folder in wrapper)
                     {
-                        Console.Write('\t');
-                        Console.WriteLine("{0} ({1} bytes, {2})", file.Name, file.Size, file.IsCompressed ? "Compressed" : "Uncompressed");
+                        Console.WriteLine(folder);
+                        foreach (var file in folder)
+                        {
+                            Console.Write('\t');
+                            Console.WriteLine("{0} ({1} bytes, {2})", file.Name, file.Size, file.IsCompressed ? "Compressed" : "Uncompressed");
+                        }
+                        //Console.ReadKey();
                     }
-                    //Console.ReadKey();
-                }
 
-                if (unpackFolder != null)
-                    wrapper.Extract(unpackFolder);
-                if (outFile != null)
-                    wrapper.Save(outFile);
+                    if (unpackFolder != null)
+                        wrapper.Extract(unpackFolder);
+                    if (outFile != null)
+                        wrapper.Save(outFile);
+                }
             }
             finally
             {
-                extractWatch.Stop();
+                watch.Stop();
             }
 
             Console.WriteLine();
-            Console.WriteLine("Complete in " + extractWatch.Elapsed.ToString() + ".");
+            Console.WriteLine("Complete in " + watch.Elapsed.ToString() + ".");
             Console.ReadKey();
         }
     }

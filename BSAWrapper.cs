@@ -113,7 +113,11 @@ namespace BSAsharp
                     var packFiles = Directory.EnumerateFiles(path);
 
                     var trimmedPath = path.Replace(packFolder, "").TrimStart(Path.DirectorySeparatorChar);
-                    var bsaFiles = packFiles.Select(file => new BSAFile(trimmedPath, Path.GetFileName(file), Settings, File.ReadAllBytes(file), false));
+                    var bsaFiles = from file in packFiles
+                                   let fileName = Path.GetFileName(file)
+                                   let fnNoExt = Path.GetFileNameWithoutExtension(fileName)
+                                   where !string.IsNullOrEmpty(fnNoExt)
+                                   select new BSAFile(trimmedPath, fileName, Settings, File.ReadAllBytes(file), false);
 
                     return new BSAFolder(trimmedPath, bsaFiles);
                 });

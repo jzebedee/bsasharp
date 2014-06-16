@@ -90,5 +90,17 @@ namespace BSAsharp_debug
             Console.WriteLine("Complete in " + watch.Elapsed.ToString() + ".");
             Console.ReadKey();
         }
+
+#if DEBUG
+        private static byte[] RandomBuffer(int size)
+        {
+            var buf = new byte[size];
+            var rnd = new Random();
+            for (int i = 0; i < buf.Length; i++)
+                buf[i] = (byte)rnd.Next(byte.MaxValue);
+
+            return buf;
+        }
+#endif
     }
 }

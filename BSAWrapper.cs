@@ -232,7 +232,7 @@ namespace BSAsharp
             return new FileRecord
             {
                 hash = file.Hash,
-                size = file.Size,
+                size = file.CalculateRecordSize(),
                 offset = 0
             };
         }

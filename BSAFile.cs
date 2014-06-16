@@ -59,7 +59,45 @@ namespace BSAsharp
         internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<BinaryReader> createReader)
             : this(path, name, settings, baseRec)
         {
-            _readData = new Lazy<byte[]>(() => ReadFileBlock(createReader(), baseRec.size));
+            var size = this.Size;
+            if (size == 0 || (size <= 4 && IsCompressed))
+            {
+                _writtenData = new byte[0];
+            }
+
+            uint offset;
+            using (var reader = createReader())
+            {
+                if (_settings.BStringPrefixed)
+                    reader.BaseStream.Seek(reader.ReadByte() + 1, SeekOrigin.Begin);
+                //reader.ReadBString();
+
+                if (IsCompressed)
+                    OriginalSize = reader.ReadUInt32();
+                //reader.BaseStream.Seek(sizeof(uint), SeekOrigin.Current);
+
+                offset = (uint)reader.BaseStream.Position;
+            }
+
+            _readData = new Lazy<byte[]>(() => ReadFileBlock(createReader(), offset, size - offset));
+        }
+
+        private BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec)
+            : this(path, name, settings)
+        {
+            bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
+            if (compressBitSet)
+                baseRec.size ^= FLAG_COMPRESS;
+
+            this.IsCompressed = CheckCompressed(compressBitSet);
+            this.Size = baseRec.size;
+        }
+        private BSAFile(string path, string name, ArchiveSettings settings)
+            : this()
+        {
+            this.Name = FixName(name);
+            this.Filename = Path.Combine(FixPath(path), name);
+            this._settings = settings;
         }
 
         //Clone ctor
@@ -70,28 +108,14 @@ namespace BSAsharp
             this.Filename = Path.Combine(FixPath(path), this.Name);
 
             this._settings = settings;
+
             this._writtenData = writtenData;
             this._readData = lazyData;
+
             this.IsCompressed = isCompressed;
+
             this.OriginalSize = originalSize;
             this.Size = size;
-        }
-        private BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec)
-            : this(path, name, settings)
-        {
-            bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
-            if (compressBitSet)
-                baseRec.size ^= FLAG_COMPRESS;
-
-            this.IsCompressed = CheckCompressed(compressBitSet);
-            this.Size = CalculateSize(baseRec.size);
-        }
-        private BSAFile(string path, string name, ArchiveSettings settings)
-            : this()
-        {
-            this.Name = FixName(name);
-            this.Filename = Path.Combine(FixPath(path), name);
-            this._settings = settings;
         }
         private BSAFile()
         {
@@ -113,23 +137,31 @@ namespace BSAsharp
             return path.ToLowerInvariant().Replace('/', '\\');
         }
 
-        private uint CalculateSize(uint baseSize, bool fromBaseData = false)
-        {
-            uint size = baseSize;
+        //private uint CalculateDataSize(uint recordSize)
+        //{
+        //    if (IsCompressed)
+        //        recordSize -= sizeof(uint);
+        //    if (_settings.BStringPrefixed)
+        //        recordSize -= (uint)Filename.Length + 1;
+        //    return recordSize;
+        //}
 
-            if (fromBaseData)
+        public uint CalculateRecordSize()
+        {
+            uint baseSize = this.Size;
+            if (_writtenData != null)
             {
                 if (IsCompressed)
-                    size += sizeof(uint);
+                    baseSize += sizeof(uint);
                 if (_settings.BStringPrefixed)
-                    size += (uint)Filename.Length + 1;
+                    baseSize += (uint)Filename.Length + 1;
             }
 
             bool setCompressBit = CheckCompressed(IsCompressed);
             if (setCompressBit)
-                size |= FLAG_COMPRESS;
+                baseSize |= FLAG_COMPRESS;
 
-            return size;
+            return baseSize;
         }
 
         private ulong MakeHash()
@@ -156,7 +188,7 @@ namespace BSAsharp
                 this.Data = GetInflatedData(inputCompressed);
                 this.OriginalSize = (uint)this.Data.Length;
             }
-            this.Size = CalculateSize((uint)buf.Length, true);
+            this.Size = (uint)buf.Length;
         }
 
         public byte[] GetSaveData(bool extract)
@@ -167,81 +199,70 @@ namespace BSAsharp
                 if (_settings.BStringPrefixed && !extract)
                     writer.WriteBString(Filename);
 
-                if (IsCompressed)
-                {
-                    if (!extract)
-                    {
-                        var defData = GetDeflatedData();
+                if (IsCompressed && !extract)
+                    writer.Write(OriginalSize);
 
-                        writer.Write(OriginalSize);
-                        writer.Write(defData);
-                    }
-                    else
-                    {
-                        writer.Write(GetInflatedData());
-                    }
-                }
-                else
-                {
-                    writer.Write(Data);
-                }
+                writer.Write(GetContents(extract));
 
                 return msOut.ToArray();
             }
         }
-        public IEnumerable<byte> GetYieldingSaveData(bool extract)
-        {
-            MemoryStream msData = new MemoryStream(Data);
 
+        public IEnumerable<byte> YieldSaveData(bool extract)
+        {
             using (var msOut = new MemoryStream())
             using (var writer = new BinaryWriter(msOut))
-                if (_settings.BStringPrefixed && !extract)
-                {
-                    writer.WriteBString(Filename);
-                    var bStringBuf = msOut.ToArray();
-
-                    foreach (var bsbyte in bStringBuf)
-                        yield return bsbyte;
-                }
-
-            if (IsCompressed)
             {
-                if (!extract)
-                {
-                    using (var msOut = new MemoryStream())
-                    using (var writer = new BinaryWriter(msOut))
-                    {
-                        writer.Write(OriginalSize);
-                        var oSizeBuf = msOut.ToArray();
+                if (_settings.BStringPrefixed && !extract)
+                    writer.WriteBString(Filename);
 
-                        foreach (var osbyte in oSizeBuf)
-                            yield return osbyte;
-                    }
+                if (IsCompressed && !extract)
+                    writer.Write(OriginalSize);
 
-                    foreach (var dbyte in Data)
-                        yield return dbyte;
-                }
-                else
-                {
-                    var infStream = ZlibDecompressStream(msData, OriginalSize);
+                return msOut.ToArray().Concat(YieldContents(extract).SelectMany(buf => buf));
+            }
+        }
 
-                    int ibyte;
-                    while ((ibyte = infStream.ReadByte()) != -1)
-                        yield return (byte)ibyte;
-
-                    infStream.Dispose();
-                }
+        public byte[] GetContents(bool extract)
+        {
+            if (extract)
+            {
+                return GetInflatedData();
             }
             else
             {
-                foreach (var dbyte in Data)
-                    yield return dbyte;
+                return GetDeflatedData();
             }
+        }
 
-            if (msData != null)
+        public IEnumerable<byte[]> YieldContents(bool extract)
+        {
+            if (extract)
             {
-                msData.Dispose();
+                foreach (var buf in YieldInflate())
+                    yield return buf;
             }
+            else
+            {
+                yield return GetDeflatedData(); //no yield, no need
+            }
+        }
+
+        private IEnumerable<byte[]> YieldInflate()
+        {
+            const int bufLength = 0x1000;
+
+            var msData = new MemoryStream(Data);
+            var infStream = ZlibDecompressStream(msData, OriginalSize);
+
+            int bytesRead;
+            byte[] buf = new byte[bufLength];
+
+            while ((bytesRead = infStream.Read(buf, 0, bufLength)) != 0)
+                yield return bytesRead == bufLength ? buf : buf.TrimBuffer(0, bytesRead);
+
+            infStream.Dispose();
+            msData.Dispose();
         }
 
         private byte[] GetDeflatedData(bool force = false)
@@ -269,26 +290,12 @@ namespace BSAsharp
             }
         }
 
-        private byte[] ReadFileBlock(BinaryReader reader, uint size)
+        private byte[] ReadFileBlock(BinaryReader reader, uint offset, uint size)
         {
             using (reader)
             {
-                if (size == 0 || (size <= 4 && IsCompressed))
-                {
-                    return new byte[0];
-                }
-
-                if (IsCompressed)
-                {
-                    OriginalSize = reader.ReadUInt32();
-                    size -= sizeof(uint);
-
-                    return reader.ReadBytes((int)size);
-                }
-                else
-                {
-                    return reader.ReadBytes((int)size);
-                }
+                reader.BaseStream.Seek(offset, SeekOrigin.Begin);
+                return reader.ReadBytes((int)size);
             }
         }
 

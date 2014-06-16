@@ -107,27 +107,7 @@ namespace BSAsharp
 
             return
                 from g in fileLookup
-                let bsaFiles = g.Select(tup =>
-                {
-                    var path = g.Key;
-                    var name = tup.Item1;
-                    var fileRec = tup.Item2;
-
-                    var fileOffset = tup.Item2.offset;
-
-                    if (Settings.BStringPrefixed)
-                    {
-                        var bstringLen = GetBStringOffset(fileOffset);
-                        if (bstringLen != 1)
-                        {
-                            fileOffset += bstringLen;
-                            if (fileRec.size > bstringLen)
-                                fileRec.size -= bstringLen;
-                        }
-                    }
-
-                    return new BSAFile(path, name, Settings, fileRec, () => ReaderFromMMF<byte>(fileOffset, fileRec.size));
-                })
+                let bsaFiles = g.Select(tup => new BSAFile(g.Key, tup.Item1, Settings, tup.Item2, () => ReaderFromMMF<byte>(tup.Item2.offset, tup.Item2.size)))
                 select new BSAFolder(g.Key, bsaFiles);
         }
 

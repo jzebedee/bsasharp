@@ -21,17 +21,16 @@ namespace BSAsharp.Extensions
             return readBytes.MarshalStruct<T>(length: structSize);
         }
 
-        public static IEnumerable<T> ReadBulkStruct<T>(this BinaryReader reader, int Count, int? Size = null)// where T : struct
+        public static IEnumerable<T> ReadBulkStruct<T>(this BinaryReader reader, uint Count, int? Size = null)// where T : struct
         {
             int structSize = Size ?? Marshal.SizeOf(typeof(T));
-            int bulkLength = structSize * Count;
+            int bulkLength = structSize * (int)Count;
 
             byte[] readBytes = reader.ReadBytes(bulkLength);
             if (readBytes.Length != bulkLength)
                 throw new ArgumentException("Size of bytes read did not match expected size");
 
-            for (int i = 0; i < Count; i++)
-                yield return readBytes.MarshalStruct<T>(i * structSize, structSize);
+            return readBytes.MarshalBulkStruct<T>(Count);
         }
 
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
@@ -87,14 +86,39 @@ namespace BSAsharp.Extensions
         {
             buf = TrimBuffer(buf, offset, length);
 
-            GCHandle pin_bytes = GCHandle.Alloc(buf, GCHandleType.Pinned);
+            GCHandle? pin_bytes = null;
             try
             {
-                return (T)Marshal.PtrToStructure(pin_bytes.AddrOfPinnedObject(), typeof(T));
+                pin_bytes = GCHandle.Alloc(buf, GCHandleType.Pinned);
+                return (T)Marshal.PtrToStructure(pin_bytes.Value.AddrOfPinnedObject(), typeof(T));
             }
             finally
             {
-                pin_bytes.Free();
+                if (pin_bytes != null)
+                    pin_bytes.Value.Free();
+            }
+        }
+
+        public static IEnumerable<T> MarshalBulkStruct<T>(this byte[] buf, uint Count, int offset = 0, int length = -1)// where T : struct
+        {
+            buf = TrimBuffer(buf, offset, length);
+
+            GCHandle? pin_bytes = null;
+            try
+            {
+                pin_bytes = GCHandle.Alloc(buf, GCHandleType.Pinned);
+
+                var size = Marshal.SizeOf(typeof(T));
+                for (int i = 0; i < Count; i++)
+                {
+                    var pOffset = Marshal.UnsafeAddrOfPinnedArrayElement(buf, i * size);
+                    yield return (T)Marshal.PtrToStructure(pOffset, typeof(T));
+                }
+            }
+            finally
+            {
+                if (pin_bytes != null)
+                    pin_bytes.Value.Free();
             }
         }
 
@@ -108,12 +132,6 @@ namespace BSAsharp.Extensions
             Buffer.BlockCopy(buf, offset, newBuf, 0, newLength);
 
             return newBuf;
-        }
-
-        public static IEnumerable<byte[]> SplitBuffer(this byte[] buf, int window)
-        {
-            for (int i = 0; i < buf.Length; i += window)
-                yield return buf.TrimBuffer(i, (i + window) > buf.Length ? -1 : window);
         }
 
         public static void WriteStruct<T>(this BinaryWriter writer, T obj)// where T : struct

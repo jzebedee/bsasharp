@@ -102,12 +102,12 @@ namespace BSAsharp
             var pathedFiles = folderDict
                 .SelectMany(kvp =>
                     kvp.Value.Select(record => new { path = kvp.Key, record }))
-                .Zip(fileNames, (a, fn) => Tuple.Create(a.path, fn, a.record));
-            var fileLookup = pathedFiles.ToLookup(tup => tup.Item1, tup => Tuple.Create(tup.Item2, tup.Item3));
+                .Zip(fileNames, (a, fn) => new { a.path, fn, a.record });
+            var fileLookup = pathedFiles.ToLookup(a => a.path, a => new { a.fn, a.record });
 
             return
                 from g in fileLookup
-                let bsaFiles = g.Select(tup => new BSAFile(g.Key, tup.Item1, Settings, tup.Item2, () => ReaderFromMMF<byte>(tup.Item2.offset, tup.Item2.size)))
+                let bsaFiles = g.Select(a => new BSAFile(g.Key, a.fn, Settings, a.record, (off, len) => FromMMF(a.record.offset + off, len)))
                 select new BSAFolder(g.Key, bsaFiles);
         }
 
@@ -117,7 +117,7 @@ namespace BSAsharp
 
             using (var reader = ReaderFromMMF<FolderRecord>(offset, folderCount))
             {
-                var folders = reader.ReadBulkStruct<FolderRecord>((int)folderCount);
+                var folders = reader.ReadBulkStruct<FolderRecord>(folderCount);
                 foreach (var folder in folders)
                 {
                     //var folderOffset = folder.offset - Header.totalFileNameLength;
@@ -140,12 +140,11 @@ namespace BSAsharp
                 folderName = nameReader.ReadBString(true);
             offset += bstringLen;
 
-            List<FileRecord> records;
             using (var recordReader = ReaderFromMMF<FileRecord>(offset, count))
-                records = recordReader.ReadBulkStruct<FileRecord>((int)count).ToList();
-            offset += BSAWrapper.SIZE_RECORD * count;
-
-            return records;
+            {
+                offset += BSAWrapper.SIZE_RECORD * count;
+                return recordReader.ReadBulkStruct<FileRecord>(count);
+            }
         }
 
         protected List<string> ReadFileNameBlocks(long offset, uint count)

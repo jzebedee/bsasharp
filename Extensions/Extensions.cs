@@ -100,14 +100,20 @@ namespace BSAsharp.Extensions
 
         public static byte[] TrimBuffer(this byte[] buf, int offset, int length = -1)
         {
-            if (offset == 0 && length < 0)
+            if (offset == 0 && (length < 0 || length == buf.Length))
                 return buf;
 
             var newLength = (length < 0 ? buf.Length - offset : length);
             var newBuf = new byte[newLength];
-            Buffer.BlockCopy(buf, offset, newBuf, 0, length);
+            Buffer.BlockCopy(buf, offset, newBuf, 0, newLength);
 
             return newBuf;
+        }
+
+        public static IEnumerable<byte[]> SplitBuffer(this byte[] buf, int window)
+        {
+            for (int i = 0; i < buf.Length; i += window)
+                yield return buf.TrimBuffer(i, (i + window) > buf.Length ? -1 : window);
         }
 
         public static void WriteStruct<T>(this BinaryWriter writer, T obj)// where T : struct

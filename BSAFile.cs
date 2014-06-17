@@ -27,7 +27,19 @@ namespace BSAsharp
         public bool IsCompressed { get; private set; }
 
         public uint Size { get; private set; }
-        public uint OriginalSize { get; private set; }
+
+        private uint _originalSize;
+        public uint OriginalSize
+        {
+            get
+            {
+                return IsCompressed ? _originalSize : Size;
+            }
+            set
+            {
+                _originalSize = value;
+            }
+        }
 
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
         private readonly Lazy<ulong> _hash;
@@ -210,6 +222,8 @@ namespace BSAsharp
 
         public IEnumerable<byte> YieldSaveData(bool extract)
         {
+            const int bufLength = 0x1000;
+
             using (var msOut = new MemoryStream())
             using (var writer = new BinaryWriter(msOut))
             {
@@ -219,7 +233,7 @@ namespace BSAsharp
                 if (IsCompressed && !extract)
                     writer.Write(OriginalSize);
 
-                return msOut.ToArray().Concat(YieldContents(extract).SelectMany(buf => buf));
+                return msOut.ToArray().Concat(YieldContents(extract, bufLength).SelectMany(buf => buf));
             }
         }
 
@@ -227,42 +241,50 @@ namespace BSAsharp
         {
             if (extract)
             {
-                return GetInflatedData();
+                return GetInflatedData(!extract);
             }
             else
             {
-                return GetDeflatedData();
+                return GetDeflatedData(extract);
             }
         }
 
-        public IEnumerable<byte[]> YieldContents(bool extract)
+        public IEnumerable<byte[]> YieldContents(bool extract, int window)
         {
             if (extract)
             {
-                foreach (var buf in YieldInflate())
+                foreach (var buf in YieldInflate(window, !extract))
                     yield return buf;
             }
             else
             {
-                yield return GetDeflatedData(); //no yield, no need
+                foreach (var subBuf in GetDeflatedData(extract).SplitBuffer(window))
+                    yield return subBuf;
             }
         }
 
-        private IEnumerable<byte[]> YieldInflate()
+        private IEnumerable<byte[]> YieldInflate(int window, bool force = false)
         {
-            const int bufLength = 0x1000;
+            if (OriginalSize == 0)
+                yield break;
 
-            var msData = new MemoryStream(Data);
-            var infStream = ZlibDecompressStream(msData, OriginalSize);
+            if (!IsCompressed ^ force)
+                foreach (var subBuf in Data.SplitBuffer(window))
+                    yield return subBuf;
+            else
+            {
+                var msData = new MemoryStream(Data);
+                var infStream = ZlibDecompressStream(msData, OriginalSize);
 
-            int bytesRead;
-            byte[] buf = new byte[bufLength];
+                int bytesRead;
+                byte[] buf = new byte[window];
 
-            while ((bytesRead = infStream.Read(buf, 0, bufLength)) != 0)
-                yield return bytesRead == bufLength ? buf : buf.TrimBuffer(0, bytesRead);
+                while ((bytesRead = infStream.Read(buf, 0, OriginalSize > window ? window : (int)OriginalSize)) != 0)
+                    yield return buf.TrimBuffer(0, bytesRead);
 
-            infStream.Dispose();
-            msData.Dispose();
+                infStream.Dispose();
+                msData.Dispose();
+            }
         }
 
         private byte[] GetDeflatedData(bool force = false)

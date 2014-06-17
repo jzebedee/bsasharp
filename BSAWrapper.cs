@@ -153,7 +153,7 @@ namespace BSAsharp
             _fileRecordOffsetsA = new Dictionary<BSAFile, uint>();
             _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
 
-            var allFiles = this.SelectMany(fold => fold);
+            var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
             File.Delete(outBsa);
@@ -242,16 +242,13 @@ namespace BSAsharp
             _folderRecordOffsetsB.Add(folder, (uint)writer.BaseStream.Position + totalFileNameLength);
             writer.WriteBZString(folder.Path);
 
-            var sortedKids = (from file in folder
-                              let record = CreateFileRecord(file)
-                              //orderby record.hash
-                              select new { file, record }).ToList();
-
-            sortedKids.ForEach(a =>
+            foreach (var file in folder)
             {
-                _fileRecordOffsetsA.Add(a.file, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
-                writer.WriteStruct(a.record);
-            });
+                var record = CreateFileRecord(file);
+
+                _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
+                writer.WriteStruct(record);
+            }
         }
 
         private FileFlags CreateFileFlags(IEnumerable<string> allFiles)

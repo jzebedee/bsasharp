@@ -191,12 +191,11 @@ namespace BSAsharp
 
                 allFileNames.ForEach(fileName => writer.WriteCString(fileName));
 
-                allFiles.ToList()
-                    .ForEach(file =>
-                    {
-                        _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
-                        writer.Write(file.GetSaveData(false));
-                    });
+                allFiles.ForEach(file =>
+                {
+                    _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
+                    writer.Write(file.GetSaveData(false));
+                });
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
                 var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));

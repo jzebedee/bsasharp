@@ -214,7 +214,7 @@ namespace BSAsharp
                 if (IsCompressed && !extract)
                     writer.Write(OriginalSize);
 
-                writer.Write(GetContents(extract));
+                writer.Write(GetContents(!IsCompressed || extract));
 
                 return msOut.ToArray();
             }
@@ -233,32 +233,32 @@ namespace BSAsharp
                 if (IsCompressed && !extract)
                     writer.Write(OriginalSize);
 
-                return msOut.ToArray().Concat(YieldContents(extract, bufLength).SelectMany(buf => buf));
+                return msOut.ToArray().Concat(YieldContents(!IsCompressed || extract, bufLength).SelectMany(buf => buf));
             }
         }
 
-        public byte[] GetContents(bool extract)
+        public byte[] GetContents(bool extract, bool force = false)
         {
             if (extract)
             {
-                return GetInflatedData(!extract);
+                return GetInflatedData(force);
             }
             else
             {
-                return GetDeflatedData(extract);
+                return GetDeflatedData(force);
             }
         }
 
-        public IEnumerable<byte[]> YieldContents(bool extract, int window)
+        public IEnumerable<byte[]> YieldContents(bool extract, int window, bool force = false)
         {
             if (extract)
             {
-                foreach (var buf in YieldInflate(window, !extract))
+                foreach (var buf in YieldInflate(window, force))
                     yield return buf;
             }
             else
             {
-                foreach (var subBuf in GetDeflatedData(extract).SplitBuffer(window))
+                foreach (var subBuf in GetDeflatedData(force).SplitBuffer(window))
                     yield return subBuf;
             }
         }
@@ -268,10 +268,7 @@ namespace BSAsharp
             if (OriginalSize == 0)
                 yield break;
 
-            if (!IsCompressed ^ force)
-                foreach (var subBuf in Data.SplitBuffer(window))
-                    yield return subBuf;
-            else
+            if (IsCompressed || force)
             {
                 var msData = new MemoryStream(Data);
                 var infStream = ZlibDecompressStream(msData, OriginalSize);
@@ -285,31 +282,34 @@ namespace BSAsharp
                 infStream.Dispose();
                 msData.Dispose();
             }
+            else
+                foreach (var subBuf in Data.SplitBuffer(window))
+                    yield return subBuf;
         }
 
         private byte[] GetDeflatedData(bool force = false)
         {
-            if (IsCompressed ^ force)
-                return this.Data;
+            if (!IsCompressed || force)
+                using (var msStream = new MemoryStream(Data))
+                {
+                    return ZlibCompress(msStream);
+                }
 
-            using (var msStream = new MemoryStream(Data))
-            {
-                return ZlibCompress(msStream);
-            }
+            return this.Data;
         }
 
         private byte[] GetInflatedData(bool force = false)
         {
-            if (!IsCompressed ^ force)
-                return Data;
+            if (IsCompressed || force)
+                using (var msStream = new MemoryStream(Data))
+                {
+                    var decompressedData = ZlibDecompress(msStream, OriginalSize);
 
-            using (var msStream = new MemoryStream(Data))
-            {
-                var decompressedData = ZlibDecompress(msStream, OriginalSize);
+                    Trace.Assert(decompressedData.Length == OriginalSize);
+                    return decompressedData;
+                }
 
-                Trace.Assert(decompressedData.Length == OriginalSize);
-                return decompressedData;
-            }
+            return Data;
         }
 
         private byte[] ReadFileBlock(BinaryReader reader, uint offset, uint size)

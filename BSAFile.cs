@@ -179,23 +179,28 @@ namespace BSAsharp
             this.Size = (uint)_writtenData.Length;
         }
 
+        public MemoryStream GetSaveStream(bool extract)
+        {
+            var msOut = new MemoryStream();
+
+            //http://stackoverflow.com/questions/12182202/should-i-dispose-a-binaryreader-if-i-need-to-preserve-the-wrapped-stream
+            //thanks Skeeter
+            var writer = new BinaryWriter(msOut);
+            if (_settings.BStringPrefixed && !extract)
+                writer.WriteBString(Filename);
+
+            if (IsCompressed && !extract)
+                writer.Write(OriginalSize);
+
+            writer.Write(GetContents(!IsCompressed || extract));
+
+            return msOut;
+        }
+
         public byte[] GetSaveData(bool extract)
         {
-            using (var msOut = new MemoryStream())
-            using (var writer = new BinaryWriter(msOut))
-            {
-                if (_settings.BStringPrefixed && !extract)
-                    writer.WriteBString(Filename);
-
-                if (IsCompressed && !extract)
-                    writer.Write(OriginalSize);
-
-                writer.Write(GetContents(!IsCompressed || extract));
-                //foreach (var buf in YieldContents(!IsCompressed || extract, 0x1000))
-                //    writer.Write(buf);
-
+            using (var msOut = GetSaveStream(extract))
                 return msOut.ToArray();
-            }
         }
 
         public byte[] GetContents(bool extract, bool force = false)
@@ -208,6 +213,29 @@ namespace BSAsharp
             {
                 return GetDeflatedData(force);
             }
+        }
+
+        public Stream GetContentStream(bool extract, bool force = false)
+        {
+            if (extract)
+            {
+                if (OriginalSize == 0)
+                    return null;
+
+                if (IsCompressed || force)
+                {
+                    return ZlibDecompressStream(GetDataStream(), OriginalSize);
+                }
+            }
+            else
+            {
+                if (!IsCompressed || force)
+                {
+                    return ZlibCompressStream(GetDataStream());
+                }
+            }
+
+            return GetDataStream();
         }
 
         public IEnumerable<byte[]> YieldContents(bool extract, int window, bool force = false)

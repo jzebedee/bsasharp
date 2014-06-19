@@ -21,7 +21,7 @@ namespace BSAsharp_debug
                 return;
             }
 
-            string inFile = null, outFile = null, packFolder = null, unpackFolder = null;
+            string inPath = null, outFile = null, packFolder = null, unpackFolder = null;
             args
                 .Select((s, i) => s.Substring(0, 1) == "-" ? new { cmd = s.Substring(1), val = args[i + 1] } : null)
                 .Where(a => a != null)
@@ -37,7 +37,7 @@ namespace BSAsharp_debug
                             unpackFolder = a.val;
                             break;
                         case "IN":
-                            inFile = a.val;
+                            inPath = a.val;
                             break;
                         case "OUT":
                             outFile = a.val;
@@ -48,46 +48,57 @@ namespace BSAsharp_debug
                     }
                 });
 
-            Trace.Assert(packFolder != null ^ inFile != null);
+            Trace.Assert(packFolder != null ^ inPath != null);
 
-            var watch = new Stopwatch();
-            try
+            IEnumerable<BSAWrapper> BSAs = null;
+            if (inPath != null)
             {
-                watch.Start();
-
-                BSAWrapper wrapper = null;
-                if (inFile != null)
-                    wrapper = new BSAWrapper(inFile);
-                else if (packFolder != null)
-                    wrapper = new BSAWrapper(packFolder, new ArchiveSettings(true, false));
-                Trace.Assert(wrapper != null);
-
-                using (wrapper)
-                {
-                    foreach (var folder in wrapper)
-                    {
-                        Console.WriteLine(folder);
-                        foreach (var file in folder)
-                        {
-                            Console.Write('\t');
-                            Console.WriteLine("{0} ({1} bytes, {2})", file.Name, file.Size, file.IsCompressed ? "Compressed" : "Uncompressed");
-                        }
-                        //Console.ReadKey();
-                    }
-
-                    if (unpackFolder != null)
-                        wrapper.Extract(unpackFolder);
-                    if (outFile != null)
-                        wrapper.Save(outFile);
-                }
+                if (File.Exists(inPath))
+                    BSAs = new[] { new BSAWrapper(inPath, CompressionStrategy.Size | CompressionStrategy.Unsafe) };
+                else if (Directory.Exists(inPath))
+                    BSAs = Directory.EnumerateFiles(inPath, "*.bsa", SearchOption.TopDirectoryOnly).Select(bsapath => new BSAWrapper(bsapath));
             }
-            finally
+            else if (packFolder != null)
+                BSAs = new[] { new BSAWrapper(packFolder, new ArchiveSettings(true, false, CompressionStrategy.Size)) };
+            Trace.Assert(BSAs != null);
+
+            foreach (var wrapper in BSAs)
             {
-                watch.Stop();
+                var watch = new Stopwatch();
+                try
+                {
+                    watch.Start();
+
+                    using (wrapper)
+                    {
+                        foreach (var folder in wrapper)
+                        {
+                            Console.WriteLine(folder);
+                            foreach (var file in folder)
+                            {
+                                Console.Write('\t');
+                                Console.WriteLine("{0} ({1} bytes, {2})", file.Name, file.Size, file.IsCompressed ? "Compressed" : "Uncompressed");
+                            }
+                            //Console.ReadKey();
+                        }
+
+                        if (unpackFolder != null)
+                            wrapper.Extract(unpackFolder);
+                        if (outFile != null)
+                            wrapper.Save(outFile);
+                    }
+                }
+                finally
+                {
+                    watch.Stop();
+                }
+
+                Console.WriteLine();
+                Console.WriteLine("Complete in " + watch.Elapsed.ToString());
             }
 
             Console.WriteLine();
-            Console.WriteLine("Complete in " + watch.Elapsed.ToString() + ".");
+            Console.WriteLine("All operations complete");
             Console.ReadKey();
         }
 

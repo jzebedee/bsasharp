@@ -16,7 +16,7 @@ namespace BSAsharp.Extensions
             int structSize = Size ?? Marshal.SizeOf(typeof(T));
             byte[] readBytes = reader.ReadBytes(structSize);
             if (readBytes.Length != structSize)
-                throw new ArgumentException("Size of bytes read did not match struct size");
+                throw new IOException("Size of bytes read did not match struct size");
 
             return readBytes.MarshalStruct<T>(length: structSize);
         }
@@ -28,7 +28,7 @@ namespace BSAsharp.Extensions
 
             byte[] readBytes = reader.ReadBytes(bulkLength);
             if (readBytes.Length != bulkLength)
-                throw new ArgumentException("Size of bytes read did not match expected size");
+                throw new IOException("Size of bytes read did not match expected size");
 
             return readBytes.MarshalBulkStruct<T>(Count);
         }

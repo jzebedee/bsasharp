@@ -49,6 +49,7 @@
     <Compile Include="ArchiveSettings.cs" />
     <Compile Include="BSAFile.cs" />
     <Compile Include="BSAFolder.cs" />
+    <Compile Include="CompressionStrategy.cs" />
     <Compile Include="HashComparer.cs" />
     <Compile Include="BSAWrapper.cs" />
     <Compile Include="Extensions\Extensions.cs" />

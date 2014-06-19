@@ -19,9 +19,10 @@ namespace BSAsharp
 
         private readonly MemoryMappedFile _mmf;
 
-        public MemoryMappedBSAReader(MemoryMappedFile mmf)
+        public MemoryMappedBSAReader(MemoryMappedFile mmf, CompressionStrategy strategy)
         {
             this._mmf = mmf;
+            this.Settings = new ArchiveSettings() { Strategy = strategy };
         }
         ~MemoryMappedBSAReader()
         {
@@ -86,9 +87,8 @@ namespace BSAsharp
                 Header = reader.ReadStruct<BSAHeader>();
             }
 
-            var BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-            var DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
-            Settings = new ArchiveSettings(DefaultCompressed, BStringPrefixed);
+            Settings.BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            Settings.DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
 
             long offset = BSAWrapper.HEADER_OFFSET;
             var folderDict = ReadFolders(ref offset, Header.folderCount);

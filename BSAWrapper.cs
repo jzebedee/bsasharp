@@ -38,8 +38,8 @@ namespace BSAsharp
         /// Creates a new BSAWrapper instance around an existing BSA file
         /// </summary>
         /// <param name="bsaPath">The path of the file to open</param>
-        public BSAWrapper(string bsaPath)
-            : this(MemoryMappedFile.CreateFromFile(bsaPath))
+        public BSAWrapper(string bsaPath, CompressionStrategy Strategy = CompressionStrategy.Size)
+            : this(MemoryMappedFile.CreateFromFile(bsaPath), Strategy)
         {
         }
         /// <summary>
@@ -63,8 +63,8 @@ namespace BSAsharp
 
         //wtf C#
         //please get real ctor overloads someday
-        private BSAWrapper(MemoryMappedFile BSAMap)
-            : this(new MemoryMappedBSAReader(BSAMap))
+        private BSAWrapper(MemoryMappedFile BSAMap, CompressionStrategy Strategy)
+            : this(new MemoryMappedBSAReader(BSAMap, Strategy))
         {
             this._bsaMap = BSAMap;
         }
@@ -128,9 +128,6 @@ namespace BSAsharp
 
         public void Extract(string outFolder)
         {
-            if (Directory.Exists(outFolder))
-                Directory.Delete(outFolder, true);
-
             foreach (var folder in this)
             {
                 Directory.CreateDirectory(Path.Combine(outFolder, folder.Path));
@@ -254,8 +251,12 @@ namespace BSAsharp
         {
             FileFlags flags = 0;
 
-            //flatten children in folders, take extension of each bsafile name and convert to uppercase, take distinct
-            var extSet = new HashSet<string>(allFiles.Select(filename => Path.GetExtension(filename).ToUpperInvariant()).Distinct());
+            //take extension of each bsafile name, take distinct, convert to uppercase
+            var extSet = new HashSet<string>(
+                allFiles
+                .Select(filename => Path.GetExtension(filename))
+                .Distinct()
+                .Select(ext => ext.ToUpperInvariant()));
 
             //if this gets unwieldy, could foreach it and have a fall-through switch
             if (extSet.Contains(".NIF"))
@@ -267,7 +268,7 @@ namespace BSAsharp
             if (extSet.Contains(".WAV"))
                 flags |= FileFlags.Wav;
             if (extSet.Contains(".MP3") || extSet.Contains(".OGG"))
-                flags |= FileFlags.Ogg;
+                flags |= FileFlags.Mp3;
             if (extSet.Contains(".TXT") || extSet.Contains(".HTML") || extSet.Contains(".BAT") || extSet.Contains(".SCC"))
                 flags |= FileFlags.Txt;
             if (extSet.Contains(".SPT"))

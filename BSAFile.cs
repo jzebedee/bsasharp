@@ -25,7 +25,9 @@ namespace BSAsharp
         public string Filename { get; private set; }
 
         public bool IsCompressed { get; private set; }
-        private bool _compressionForced = false;
+
+        private bool _forceCompressionChecked = false;
+        private int? _optDeflateLevel;
 
         public uint Size { get; private set; }
 
@@ -50,6 +52,22 @@ namespace BSAsharp
         private Func<Stream> _createStream;
 
         private readonly ArchiveSettings _settings;
+
+        private CompressionOptions Options
+        {
+            get
+            {
+                return _settings.Options;
+            }
+        }
+
+        private CompressionStrategy Strategy
+        {
+            get
+            {
+                return Options.Strategy;
+            }
+        }
 
         public BSAFile(string path, string name, ArchiveSettings settings, byte[] data, bool inputCompressed)
             : this(path, name, settings)
@@ -92,7 +110,9 @@ namespace BSAsharp
             this.Filename = Path.Combine(FixPath(path), name);
             this._settings = settings;
 
-            if (_settings.Strategy.HasFlag(CompressionStrategy.Aggressive))
+            CheckCompressionSettings();
+
+            if (Strategy.HasFlag(CompressionStrategy.Aggressive))
                 throw new NotImplementedException("CompressionStrategy.Aggressive");
         }
 
@@ -112,6 +132,8 @@ namespace BSAsharp
 
             this.OriginalSize = originalSize;
             this.Size = size;
+
+            CheckCompressionSettings();
         }
         private BSAFile()
         {
@@ -135,6 +157,8 @@ namespace BSAsharp
 
         public uint CalculateRecordSize()
         {
+            ForceCompressionIfNeeded();
+
             uint baseSize = this.Size;
             if (_writtenData != null)
             {
@@ -151,6 +175,20 @@ namespace BSAsharp
             return baseSize;
         }
 
+        private void CheckCompressionSettings()
+        {
+            _optDeflateLevel = Options.GetCompressionLevel(Path.GetExtension(Name));
+            if (_optDeflateLevel.HasValue && _optDeflateLevel.Value < 0)
+            {
+                //blocks compression changing on this file
+                _forceCompressionChecked = true;
+            }
+            else
+            {
+                _forceCompressionChecked = false;
+            }
+        }
+
         private ulong MakeHash()
         {
             return Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name));
@@ -163,6 +201,7 @@ namespace BSAsharp
 
         public void UpdateData(byte[] buf, bool inputCompressed, bool flipCompression = false)
         {
+            CheckCompressionSettings();
             this.IsCompressed = CheckCompressed(flipCompression);
             this._writtenData = buf;
 
@@ -180,45 +219,49 @@ namespace BSAsharp
             this.Size = (uint)_writtenData.Length;
         }
 
-        public MemoryStream GetSaveStream(bool extract)
+        private void ForceCompressionIfNeeded()
         {
-            if (_settings.Strategy.HasFlag(CompressionStrategy.Unsafe) && !_compressionForced)
+            if (Strategy.HasFlag(CompressionStrategy.Unsafe) && !_forceCompressionChecked)
             {
-                if (!IsCompressed || _settings.Strategy.HasFlag(CompressionStrategy.Aggressive))
+                _forceCompressionChecked = true;
+                if (!IsCompressed || Strategy.HasFlag(CompressionStrategy.Aggressive))
                 {
-                    UpdateData(GetRawSaveData(true), false, !IsCompressed);
+                    UpdateData(GetContents(true), false, !IsCompressed);
                 }
-                _compressionForced = true;
             }
-
-            return GetRawSaveStream(extract);
         }
-        private MemoryStream GetRawSaveStream(bool extract)
+
+        public MemoryStream GetSaveStream()
+        {
+            ForceCompressionIfNeeded();
+            return GetRawSaveStream();
+        }
+        private MemoryStream GetRawSaveStream()
         {
             var msOut = new MemoryStream();
 
             //http://stackoverflow.com/questions/12182202/should-i-dispose-a-binaryreader-if-i-need-to-preserve-the-wrapped-stream
             //thanks Skeeter
             var writer = new BinaryWriter(msOut);
-            if (_settings.BStringPrefixed && !extract)
+            if (_settings.BStringPrefixed)
                 writer.WriteBString(Filename);
 
-            if (IsCompressed && !extract)
+            if (IsCompressed)
                 writer.Write(OriginalSize);
 
-            writer.Write(GetContents(!IsCompressed || extract));
+            writer.Write(GetContents(!IsCompressed));
 
             return msOut;
         }
 
-        public byte[] GetSaveData(bool extract)
+        public byte[] GetSaveData()
         {
-            using (var msOut = GetSaveStream(extract))
+            using (var msOut = GetSaveStream())
                 return msOut.ToArray();
         }
-        private byte[] GetRawSaveData(bool extract)
+        private byte[] GetRawSaveData()
         {
-            using (var msOut = GetRawSaveStream(extract))
+            using (var msOut = GetRawSaveStream())
                 return msOut.ToArray();
         }
 
@@ -349,7 +392,7 @@ namespace BSAsharp
         {
             using (MemoryStream msCompressed = new MemoryStream())
             {
-                using (var defStream = MakeZlibDeflateStream(msCompressed, _settings.Strategy))
+                using (var defStream = MakeZlibDeflateStream(msCompressed))
                 {
                     decompressedStream.CopyTo(defStream);
                 }
@@ -360,20 +403,23 @@ namespace BSAsharp
 
         private Stream ZlibCompressStream(Stream msCompressed)
         {
-            return MakeZlibDeflateStream(msCompressed, _settings.Strategy);
+            return MakeZlibDeflateStream(msCompressed);
         }
 
-        private static Stream MakeZlibDeflateStream(Stream outStream, CompressionStrategy strategy)
+        private Stream MakeZlibDeflateStream(Stream outStream)
         {
             //you can substitute any zlib-compatible deflater here
             //gzip, zopfli, etc
-            Deflater defl = null;
-            if (strategy.HasFlag(CompressionStrategy.Size | CompressionStrategy.Speed))
-                defl = new Deflater(DEFLATE_LEVEL_MIXED);
-            if (strategy.HasFlag(CompressionStrategy.Speed))
-                defl = new Deflater(DEFLATE_LEVEL_SPEED);
-            if (strategy.HasFlag(CompressionStrategy.Size))
-                defl = new Deflater(DEFLATE_LEVEL_SIZE);
+            Deflater defl = _optDeflateLevel.HasValue ? new Deflater(_optDeflateLevel.Value) : null;
+            if (defl == null)
+            {
+                if (Strategy.HasFlag(CompressionStrategy.Size | CompressionStrategy.Speed))
+                    defl = new Deflater(DEFLATE_LEVEL_MIXED);
+                if (Strategy.HasFlag(CompressionStrategy.Speed))
+                    defl = new Deflater(DEFLATE_LEVEL_SPEED);
+                if (Strategy.HasFlag(CompressionStrategy.Size))
+                    defl = new Deflater(DEFLATE_LEVEL_SIZE);
+            }
 
             if (defl == null)
                 throw new ArgumentException("CompressionStrategy did not have enough information");

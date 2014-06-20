@@ -38,8 +38,8 @@ namespace BSAsharp
         /// Creates a new BSAWrapper instance around an existing BSA file
         /// </summary>
         /// <param name="bsaPath">The path of the file to open</param>
-        public BSAWrapper(string bsaPath, CompressionStrategy Strategy = CompressionStrategy.Size)
-            : this(MemoryMappedFile.CreateFromFile(bsaPath), Strategy)
+        public BSAWrapper(string bsaPath, CompressionOptions Options = null)
+            : this(MemoryMappedFile.CreateFromFile(bsaPath), Options ?? new CompressionOptions())
         {
         }
         /// <summary>
@@ -63,8 +63,8 @@ namespace BSAsharp
 
         //wtf C#
         //please get real ctor overloads someday
-        private BSAWrapper(MemoryMappedFile BSAMap, CompressionStrategy Strategy)
-            : this(new MemoryMappedBSAReader(BSAMap, Strategy))
+        private BSAWrapper(MemoryMappedFile BSAMap, CompressionOptions Options)
+            : this(new MemoryMappedBSAReader(BSAMap, Options))
         {
             this._bsaMap = BSAMap;
         }
@@ -135,7 +135,7 @@ namespace BSAsharp
                 foreach (var file in folder)
                 {
                     var filePath = Path.Combine(outFolder, file.Filename);
-                    File.WriteAllBytes(filePath, file.GetSaveData(true));
+                    File.WriteAllBytes(filePath, file.GetContents(true));
                 }
             }
         }
@@ -191,7 +191,7 @@ namespace BSAsharp
                 allFiles.ForEach(file =>
                 {
                     _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
-                    writer.Write(file.GetSaveData(false));
+                    writer.Write(file.GetSaveData());
                 });
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));

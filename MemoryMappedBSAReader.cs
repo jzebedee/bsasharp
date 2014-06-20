@@ -19,10 +19,10 @@ namespace BSAsharp
 
         private readonly MemoryMappedFile _mmf;
 
-        public MemoryMappedBSAReader(MemoryMappedFile mmf, CompressionStrategy strategy)
+        public MemoryMappedBSAReader(MemoryMappedFile mmf, CompressionOptions options)
         {
             this._mmf = mmf;
-            this.Settings = new ArchiveSettings() { Strategy = strategy };
+            this.Settings = new ArchiveSettings() { Options = options };
         }
         ~MemoryMappedBSAReader()
         {

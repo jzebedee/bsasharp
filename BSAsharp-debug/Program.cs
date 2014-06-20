@@ -54,12 +54,12 @@ namespace BSAsharp_debug
             if (inPath != null)
             {
                 if (File.Exists(inPath))
-                    BSAs = new[] { new BSAWrapper(inPath, CompressionStrategy.Size | CompressionStrategy.Unsafe) };
+                    BSAs = new[] { new BSAWrapper(inPath, new CompressionOptions(CompressionStrategy.Size | CompressionStrategy.Unsafe)) };
                 else if (Directory.Exists(inPath))
                     BSAs = Directory.EnumerateFiles(inPath, "*.bsa", SearchOption.TopDirectoryOnly).Select(bsapath => new BSAWrapper(bsapath));
             }
             else if (packFolder != null)
-                BSAs = new[] { new BSAWrapper(packFolder, new ArchiveSettings(true, false, CompressionStrategy.Size)) };
+                BSAs = new[] { new BSAWrapper(packFolder, new ArchiveSettings(true, false, new CompressionOptions(CompressionStrategy.Size))) };
             Trace.Assert(BSAs != null);
 
             foreach (var wrapper in BSAs)

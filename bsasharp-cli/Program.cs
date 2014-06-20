@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using BSAsharp;
 
-namespace BSAsharp_debug
+namespace BSAsharp_cli
 {
     class Program
     {
@@ -16,7 +16,7 @@ namespace BSAsharp_debug
             if (args.Length == 0 || args.Length % 2 != 0)
             {
                 Console.WriteLine("Use:");
-                Console.WriteLine("bsasharp-debug <args>");
+                Console.WriteLine("bsasharp-cli <args>");
                 Console.ReadKey();
                 return;
             }

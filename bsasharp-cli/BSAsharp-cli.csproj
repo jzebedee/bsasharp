@@ -7,8 +7,8 @@
     <ProjectGuid>{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>BSAsharp_debug</RootNamespace>
-    <AssemblyName>BSAsharp-debug</AssemblyName>
+    <RootNamespace>BSAsharp_cli</RootNamespace>
+    <AssemblyName>BSAsharp-cli</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile>Client</TargetFrameworkProfile>

@@ -51,7 +51,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BSAsharp.csproj">
+    <ProjectReference Include="..\BSAsharp\BSAsharp.csproj">
       <Project>{dd09d7a2-2de0-4ca3-8a59-8119dd23f7d7}</Project>
       <Name>BSAsharp</Name>
     </ProjectReference>

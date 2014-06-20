@@ -87,6 +87,9 @@ namespace BSAsharp
                 Header = reader.ReadStruct<BSAHeader>();
             }
 
+            if (Header.version != BSAWrapper.FALLOUT_VERSION)
+                throw new NotImplementedException("Unsupported BSA version");
+
             Settings.BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
             Settings.DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
 

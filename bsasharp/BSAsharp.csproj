@@ -33,6 +33,12 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>..\BSAsharp.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>packages\SharpZipLib.0.86.0\lib\20\ICSharpCode.SharpZipLib.dll</HintPath>
@@ -63,6 +69,7 @@
     <Compile Include="IHashed.cs" />
     <Compile Include="MemoryMappedBSAReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Zlib.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

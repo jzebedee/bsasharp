@@ -123,7 +123,6 @@ namespace BSAsharp
                 var folders = reader.ReadBulkStruct<FolderRecord>(folderCount);
                 foreach (var folder in folders)
                 {
-                    //var folderOffset = folder.offset - Header.totalFileNameLength;
                     offset = folder.offset - Header.totalFileNameLength;
 
                     string folderName;

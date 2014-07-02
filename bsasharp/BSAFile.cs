@@ -5,11 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.IO.Compression;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
-using ICSharpCode.SharpZipLib.Zip.Compression;
-using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 
 namespace BSAsharp
 {
@@ -286,14 +283,14 @@ namespace BSAsharp
 
                 if (IsCompressed || force)
                 {
-                    return ZlibDecompressStream(GetDataStream(), OriginalSize);
+                    return Zlib.DecompressStream(GetDataStream(), OriginalSize);
                 }
             }
             else
             {
                 if (!IsCompressed || force)
                 {
-                    return ZlibCompressStream(GetDataStream());
+                    return Zlib.CompressStream(GetDataStream(), GetDeflateLevel());
                 }
             }
 
@@ -335,7 +332,7 @@ namespace BSAsharp
             if (!IsCompressed || force)
                 using (var dataStream = GetDataStream())
                 {
-                    return ZlibCompress(dataStream);
+                    return Zlib.Compress(dataStream, GetDeflateLevel());
                 }
 
             return GetData();
@@ -346,7 +343,7 @@ namespace BSAsharp
             if (IsCompressed || force)
                 using (var dataStream = GetDataStream())
                 {
-                    var decompressedData = ZlibDecompress(dataStream, OriginalSize);
+                    var decompressedData = Zlib.Decompress(dataStream, OriginalSize);
 
                     if (decompressedData.Length != OriginalSize)
                         throw new IOException("Inflated size did not match original size");
@@ -357,74 +354,19 @@ namespace BSAsharp
             return GetData();
         }
 
-        private byte[] ZlibDecompress(Stream compressedStream, uint originalSize)
+        private int GetDeflateLevel()
         {
-            if (originalSize == 0)
-                return new byte[0];
+            if (_optDeflateLevel.HasValue)
+                return _optDeflateLevel.Value;
 
-            using (var msDecompressed = new MemoryStream((int)originalSize))
-            {
-                using (var infStream = ZlibDecompressStream(compressedStream, originalSize))
-                    infStream.CopyTo(msDecompressed);
+            if (Strategy.HasFlag(CompressionStrategy.Size | CompressionStrategy.Speed))
+                return DEFLATE_LEVEL_MIXED;
+            if (Strategy.HasFlag(CompressionStrategy.Speed))
+                return DEFLATE_LEVEL_SPEED;
+            if (Strategy.HasFlag(CompressionStrategy.Size))
+                return DEFLATE_LEVEL_SIZE;
 
-                return msDecompressed.ToArray();
-            }
-        }
-
-        private Stream ZlibDecompressStream(Stream compressedStream, uint originalSize)
-        {
-            if (originalSize == 0)
-                throw new ArgumentException("originalSize cannot be 0");
-
-            if (originalSize == 4)
-                //Skip zlib descriptors and ignore header for this file
-                compressedStream.Seek(2, SeekOrigin.Begin);
-
-            return MakeZlibInflateStream(compressedStream, originalSize == 4);
-        }
-
-        private static Stream MakeZlibInflateStream(Stream inStream, bool skipHeader)
-        {
-            return new InflaterInputStream(inStream, new Inflater(skipHeader));
-        }
-
-        private byte[] ZlibCompress(Stream decompressedStream)
-        {
-            using (MemoryStream msCompressed = new MemoryStream())
-            {
-                using (var defStream = MakeZlibDeflateStream(msCompressed))
-                {
-                    decompressedStream.CopyTo(defStream);
-                }
-
-                return msCompressed.ToArray();
-            }
-        }
-
-        private Stream ZlibCompressStream(Stream msCompressed)
-        {
-            return MakeZlibDeflateStream(msCompressed);
-        }
-
-        private Stream MakeZlibDeflateStream(Stream outStream)
-        {
-            //you can substitute any zlib-compatible deflater here
-            //gzip, zopfli, etc
-            Deflater defl = _optDeflateLevel.HasValue ? new Deflater(_optDeflateLevel.Value) : null;
-            if (defl == null)
-            {
-                if (Strategy.HasFlag(CompressionStrategy.Size | CompressionStrategy.Speed))
-                    defl = new Deflater(DEFLATE_LEVEL_MIXED);
-                if (Strategy.HasFlag(CompressionStrategy.Speed))
-                    defl = new Deflater(DEFLATE_LEVEL_SPEED);
-                if (Strategy.HasFlag(CompressionStrategy.Size))
-                    defl = new Deflater(DEFLATE_LEVEL_SIZE);
-            }
-
-            if (defl == null)
-                throw new ArgumentException("CompressionStrategy did not have enough information");
-
-            return new DeflaterOutputStream(outStream, defl);
+            throw new ArgumentException("CompressionStrategy did not have enough information");
         }
 
         public object Clone()

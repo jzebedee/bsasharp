@@ -15,5 +15,15 @@ namespace BSAsharp_ui
         {
             InitializeComponent();
         }
+
+        private void frmMain_Load(object sender, EventArgs e)
+        {
+            //ToolStripManager.LoadSettings(this);
+        }
+
+        private void frmMain_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            ToolStripManager.SaveSettings(this);
+        }
     }
 }

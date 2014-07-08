@@ -11,6 +11,7 @@ using System.Threading;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace BSAsharp
 {
@@ -142,75 +143,89 @@ namespace BSAsharp
 
         public void Save(string outBsa, bool recreate = false)
         {
-            BSAHeader header;
-            if (!recreate)
-                header = _readHeader;
-            else
-                header = new BSAHeader();
-
             _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>();
             _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
 
             _fileRecordOffsetsA = new Dictionary<BSAFile, uint>();
             _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
 
+            outBsa = Path.GetFullPath(outBsa);
+            Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
+            File.Delete(outBsa);
+
+            var mapName = Path.GetRandomFileName();
+            using (var mmf = MemoryMappedFile.CreateNew(mapName, BSA_MAX_SIZE, MemoryMappedFileAccess.ReadWrite))
+            {
+                var makeTask = Task.Factory.StartNew(() => SaveToMMF(mmf, recreate));
+                var saveTask = makeTask.ContinueWith(t => CopyToFile(mmf, outBsa));
+
+                saveTask.Wait();
+            }
+        }
+
+        private void SaveToMMF(MemoryMappedFile mmf, bool recreate)
+        {
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            outBsa = Path.GetFullPath(outBsa);
-            Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
+            var header = recreate ? new BSAHeader() : _readHeader;
 
-            File.Delete(outBsa);
-            using (var mmf = MemoryMappedFile.CreateFromFile(outBsa, FileMode.Create, Path.GetRandomFileName(), BSA_MAX_SIZE, MemoryMappedFileAccess.ReadWrite))
+            header.field = BSA_GREET;
+            header.version = FALLOUT_VERSION;
+            header.offset = HEADER_OFFSET;
+            if (recreate)
             {
-                header.field = BSA_GREET;
-                header.version = FALLOUT_VERSION;
-                header.offset = HEADER_OFFSET;
-                if (recreate)
+                header.archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
+                if (Settings.DefaultCompressed)
+                    header.archiveFlags |= ArchiveFlags.Compressed;
+                if (Settings.BStringPrefixed)
+                    header.archiveFlags |= ArchiveFlags.BStringPrefixed;
+            }
+            header.folderCount = (uint)this.Count();
+            header.fileCount = (uint)allFileNames.Count;
+            header.totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1);
+            header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
+            if (recreate)
+            {
+                header.fileFlags = CreateFileFlags(allFileNames);
+            }
+
+            uint offset = 0;
+            using (var writer = mmf.ToWriter<BSAHeader>(offset))
+                header.Write(writer);
+            offset += HEADER_OFFSET;
+
+            var orderedFolders = this.Select(folder => new { folder, record = CreateFolderRecord(folder) }).ToList();
+
+            orderedFolders.ForEach(a => WriteFolderRecord(mmf, ref offset, a.folder, a.record));
+
+            orderedFolders.ForEach(a => WriteFileRecordBlock(mmf, ref offset, a.folder, header.totalFileNameLength));
+
+            using (var writer = mmf.ToWriter(offset, header.totalFileNameLength))
+                allFileNames.ForEach(fileName => writer.WriteCString(fileName));
+            offset += header.totalFileNameLength;
+
+            allFiles.ForEach(file => WriteFileBlock(mmf, ref offset, file));
+
+            var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
+            var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
+            var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets);
+
+            completeOffsets
+                .ToList()
+                .ForEach(kvp =>
                 {
-                    header.archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
-                    if (Settings.DefaultCompressed)
-                        header.archiveFlags |= ArchiveFlags.Compressed;
-                    if (Settings.BStringPrefixed)
-                        header.archiveFlags |= ArchiveFlags.BStringPrefixed;
-                }
-                header.folderCount = (uint)this.Count();
-                header.fileCount = (uint)allFileNames.Count;
-                header.totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1);
-                header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
-                if (recreate)
-                {
-                    header.fileFlags = CreateFileFlags(allFileNames);
-                }
+                    using (var writer = mmf.ToWriter(kvp.Key, sizeof(uint)))
+                        writer.Write(kvp.Value);
+                });
+        }
 
-                uint offset = 0;
-                using (var writer = mmf.ToWriter<BSAHeader>(offset))
-                    header.Write(writer);
-                offset += HEADER_OFFSET;
-
-                var orderedFolders = this.Select(folder => new { folder, record = CreateFolderRecord(folder) }).ToList();
-
-                orderedFolders.ForEach(a => WriteFolderRecord(mmf, ref offset, a.folder, a.record));
-
-                orderedFolders.ForEach(a => WriteFileRecordBlock(mmf, ref offset, a.folder, header.totalFileNameLength));
-
-                using (var writer = mmf.ToWriter(offset, header.totalFileNameLength))
-                    allFileNames.ForEach(fileName => writer.WriteCString(fileName));
-                offset += header.totalFileNameLength;
-
-                allFiles.ForEach(file => WriteFileBlock(mmf, ref offset, file));
-
-                var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
-                var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
-                var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets);
-
-                completeOffsets
-                    .ToList()
-                    .ForEach(kvp =>
-                    {
-                        using (var writer = mmf.ToWriter(kvp.Key, sizeof(uint)))
-                            writer.Write(kvp.Value);
-                    });
+        private void CopyToFile(MemoryMappedFile mmf, string filePath)
+        {
+            using (var fileStream = File.OpenWrite(filePath))
+            using (var mapStream = mmf.CreateViewStream())
+            {
+                mapStream.CopyTo(fileStream);
             }
         }
 

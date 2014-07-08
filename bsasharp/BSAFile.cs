@@ -42,8 +42,8 @@ namespace BSAsharp
         }
 
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
-        private readonly Lazy<ulong> _hash;
-        public ulong Hash { get { return _hash.Value; } }
+        private readonly ulong _hash;
+        public ulong Hash { get { return _hash; } }
 
         private byte[] _writtenData;
         private Func<Stream> _createStream;
@@ -101,10 +101,8 @@ namespace BSAsharp
             this.Size = baseRec.size;
         }
         private BSAFile(string path, string name, ArchiveSettings settings)
-            : this()
+            : this(path, name)
         {
-            this.Name = FixName(name);
-            this.Filename = Path.Combine(FixPath(path), name);
             this._settings = settings;
 
             CheckCompressionSettings();
@@ -115,11 +113,8 @@ namespace BSAsharp
 
         //Clone ctor
         private BSAFile(string path, string name, ArchiveSettings settings, Func<Stream> createStream, byte[] writtenData, bool isCompressed, uint originalSize, uint size)
-            : this()
+            : this(path, name)
         {
-            this.Name = FixName(name);
-            this.Filename = Path.Combine(FixPath(path), this.Name);
-
             this._settings = settings;
 
             this._writtenData = writtenData;
@@ -132,9 +127,12 @@ namespace BSAsharp
 
             CheckCompressionSettings();
         }
-        private BSAFile()
+        private BSAFile(string path, string name)
         {
-            _hash = new Lazy<ulong>(MakeHash);
+            this.Name = FixName(name);
+            this.Filename = Path.Combine(FixPath(path), this.Name);
+
+            _hash = MakeHash();
         }
 
         public override string ToString()

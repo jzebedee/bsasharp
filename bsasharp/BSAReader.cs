@@ -11,7 +11,7 @@ using BSAsharp.Extensions;
 
 namespace BSAsharp
 {
-    internal class MemoryMappedBSAReader : IDisposable
+    internal class BSAReader : IDisposable
     {
         public BSAHeader Header { get; protected set; }
 
@@ -19,12 +19,12 @@ namespace BSAsharp
 
         private readonly MemoryMappedFile _mmf;
 
-        public MemoryMappedBSAReader(MemoryMappedFile mmf, CompressionOptions options)
+        public BSAReader(MemoryMappedFile mmf, CompressionOptions options)
         {
             this._mmf = mmf;
             this.Settings = new ArchiveSettings() { Options = options };
         }
-        ~MemoryMappedBSAReader()
+        ~BSAReader()
         {
             Dispose(false);
         }
@@ -42,39 +42,9 @@ namespace BSAsharp
             GC.SuppressFinalize(this);
         }
 
-        private Stream FromMMF(long offset, long size)
-        {
-            return _mmf.CreateViewStream(offset, size, MemoryMappedFileAccess.Read);
-        }
-
-        private Stream FromMMF<T>(long offset)
-        {
-            return FromMMF(offset, Marshal.SizeOf(typeof(T)));
-        }
-
-        private Stream FromMMF<T>(long offset, uint count)
-        {
-            return FromMMF(offset, Marshal.SizeOf(typeof(T)) * count);
-        }
-
-        private BinaryReader ReaderFromMMF<T>(long offset)
-        {
-            return new BinaryReader(FromMMF<T>(offset));
-        }
-
-        private BinaryReader ReaderFromMMF<T>(long offset, uint count)
-        {
-            return new BinaryReader(FromMMF<T>(offset, count));
-        }
-
-        private BinaryReader ReaderFromMMF(long offset, long size)
-        {
-            return new BinaryReader(FromMMF(offset, size));
-        }
-
         private uint GetBStringOffset(long offset)
         {
-            using (var lengthReader = ReaderFromMMF<byte>(offset))
+            using (var lengthReader = _mmf.ToReader<byte>(offset))
             {
                 return lengthReader.ReadByte() + 1u;
             }
@@ -82,9 +52,9 @@ namespace BSAsharp
 
         public IEnumerable<BSAFolder> Read()
         {
-            using (var reader = ReaderFromMMF<BSAHeader>(0))
+            using (var reader = _mmf.ToReader<BSAHeader>(0))
             {
-                Header = reader.ReadStruct<BSAHeader>();
+                Header = new BSAHeader(reader);
             }
 
             if (Header.version != BSAWrapper.FALLOUT_VERSION)
@@ -100,7 +70,7 @@ namespace BSAsharp
             return BuildBSALayout(folderDict, fileNames);
         }
 
-        protected IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, IEnumerable<FileRecord>> folderDict, List<string> fileNames)
+        protected IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
         {
             var pathedFiles = folderDict
                 .SelectMany(kvp =>
@@ -110,17 +80,19 @@ namespace BSAsharp
 
             return
                 from g in fileLookup
-                let bsaFiles = g.Select(a => new BSAFile(g.Key, a.fn, Settings, a.record, (off, len) => FromMMF(a.record.offset + off, len)))
+                let bsaFiles = g.Select(a => new BSAFile(g.Key, a.fn, Settings, a.record, (off, len) => _mmf.ToStream(a.record.offset + off, len)))
                 select new BSAFolder(g.Key, bsaFiles);
         }
 
-        protected Dictionary<string, IEnumerable<FileRecord>> ReadFolders(ref long offset, uint folderCount)
+        protected Dictionary<string, IList<FileRecord>> ReadFolders(ref long offset, uint folderCount)
         {
-            var folderDict = new Dictionary<string, IEnumerable<FileRecord>>();
+            var folderDict = new Dictionary<string, IList<FileRecord>>();
 
-            using (var reader = ReaderFromMMF<FolderRecord>(offset, folderCount))
+            using (var reader = _mmf.ToReaderBulk<FolderRecord>(offset, folderCount))
             {
-                var folders = reader.ReadBulkStruct<FolderRecord>(folderCount);
+                var folders = new List<FolderRecord>((int)folderCount);
+                for (int i = 0; i < folderCount; i++)
+                    folders.Add(new FolderRecord(reader));
                 foreach (var folder in folders)
                 {
                     offset = folder.offset - Header.totalFileNameLength;
@@ -135,25 +107,28 @@ namespace BSAsharp
             return folderDict;
         }
 
-        protected IEnumerable<FileRecord> ReadFileRecordBlocks(ref long offset, uint count, out string folderName)
+        protected IList<FileRecord> ReadFileRecordBlocks(ref long offset, uint count, out string folderName)
         {
             var bstringLen = GetBStringOffset(offset);
-            using (var nameReader = ReaderFromMMF(offset, bstringLen))
+            using (var nameReader = _mmf.ToReader(offset, bstringLen))
                 folderName = nameReader.ReadBString(true);
             offset += bstringLen;
 
-            using (var recordReader = ReaderFromMMF<FileRecord>(offset, count))
+            var files = new List<FileRecord>((int)count);
+            using (var reader = _mmf.ToReaderBulk<FileRecord>(offset, count))
             {
                 offset += BSAWrapper.SIZE_RECORD * count;
-                return recordReader.ReadBulkStruct<FileRecord>(count);
+                for (int i = 0; i < count; i++)
+                    files.Add(new FileRecord(reader));
+                return files;
             }
         }
 
-        protected List<string> ReadFileNameBlocks(long offset, uint count)
+        protected IList<string> ReadFileNameBlocks(long offset, uint count)
         {
             var fileNames = new List<string>((int)count);
 
-            using (var reader = ReaderFromMMF(offset, Header.totalFileNameLength))
+            using (var reader = _mmf.ToReader(offset, Header.totalFileNameLength))
                 for (int i = 0; i < count; i++)
                     fileNames.Add(reader.ReadCString());
 

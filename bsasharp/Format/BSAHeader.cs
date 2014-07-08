@@ -1,42 +1,47 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace BSAsharp.Format
 {
-    //var field = _reader.ReadChars(4);
-    //var version = _reader.ReadUInt32();
-    //var offset = _reader.ReadUInt32();
-    //var archiveFlags = (ArchiveFlags)_reader.ReadUInt32();
-    //var folderCount = _reader.ReadUInt32();
-    //var fileCount = _reader.ReadUInt32();
-    //var totalFolderNameLength = _reader.ReadUInt32();
-    //var totalFileNameLength = _reader.ReadUInt32();
-    //var fileFlags = (FileFlags)_reader.ReadUInt32();
-
-    [StructLayout(LayoutKind.Sequential)]
-    public class BSAHeader
+    public struct BSAHeader
     {
-        //0h
-        [MarshalAs(UnmanagedType.ByValArray, /*ArraySubType = UnmanagedType.U1,*/ SizeConst = 4)]
-        public char[] field;
-        //4h
+        public BSAHeader(BinaryReader reader)
+        {
+            field = reader.ReadUInt32();
+            version = reader.ReadUInt32();
+            offset = reader.ReadUInt32();
+            archiveFlags = (ArchiveFlags)reader.ReadUInt32();
+            folderCount = reader.ReadUInt32();
+            fileCount = reader.ReadUInt32();
+            totalFolderNameLength = reader.ReadUInt32();
+            totalFileNameLength = reader.ReadUInt32();
+            fileFlags = (FileFlags)reader.ReadUInt32();
+        }
+        public void Write(BinaryWriter writer)
+        {
+            writer.Write(field);
+            writer.Write(version);
+            writer.Write(offset);
+            writer.Write((uint)archiveFlags);
+            writer.Write(folderCount);
+            writer.Write(fileCount);
+            writer.Write(totalFolderNameLength);
+            writer.Write(totalFileNameLength);
+            writer.Write((uint)fileFlags);
+        }
+
+        public uint field;
         public uint version;
-        //8h
         public uint offset;
-        //Ch
         public ArchiveFlags archiveFlags;
-        //10h
         public uint folderCount;
-        //14h
         public uint fileCount;
-        //18h
         public uint totalFolderNameLength;
-        //1Ch
         public uint totalFileNameLength;
-        //20h
         public FileFlags fileFlags;
     }
 }

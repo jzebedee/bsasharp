@@ -20,9 +20,9 @@ namespace BSAsharp
             FALLOUT_VERSION = 0x68,
             HEADER_OFFSET = 0x24, //sizeof(BSAHeader)
             SIZE_RECORD = 0x10, //sizeof(FolderRecord) or sizeof(FileRecord)
-            SIZE_RECORD_OFFSET = 0xC; //SIZE_RECORD - sizeof(uint)
-
-        static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
+            SIZE_RECORD_OFFSET = 0xC, //SIZE_RECORD - sizeof(uint)
+            BSA_GREET = 0x415342; //'B','S','A','\0'
+        public const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
 
         private readonly BSAHeader _readHeader;
 
@@ -64,11 +64,11 @@ namespace BSAsharp
         //wtf C#
         //please get real ctor overloads someday
         private BSAWrapper(MemoryMappedFile BSAMap, CompressionOptions Options)
-            : this(new MemoryMappedBSAReader(BSAMap, Options))
+            : this(new BSAReader(BSAMap, Options))
         {
             this._bsaMap = BSAMap;
         }
-        private BSAWrapper(MemoryMappedBSAReader BSAReader)
+        private BSAWrapper(BSAReader BSAReader)
             : this(BSAReader.Read())
         {
             this._readHeader = BSAReader.Header;
@@ -85,7 +85,7 @@ namespace BSAsharp
             Dispose(false);
         }
 
-        private readonly MemoryMappedBSAReader _bsaReader;
+        private readonly BSAReader _bsaReader;
         private readonly MemoryMappedFile _bsaMap;
 
         protected virtual void Dispose(bool disposing)
@@ -142,7 +142,11 @@ namespace BSAsharp
 
         public void Save(string outBsa, bool recreate = false)
         {
-            bool reuseAttributes = _readHeader != null && !recreate;
+            BSAHeader header;
+            if (!recreate)
+                header = _readHeader;
+            else
+                header = new BSAHeader();
 
             _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>();
             _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
@@ -153,58 +157,72 @@ namespace BSAsharp
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
+            outBsa = Path.GetFullPath(outBsa);
+            Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
+
             File.Delete(outBsa);
-            using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
+            using (var mmf = MemoryMappedFile.CreateFromFile(outBsa, FileMode.Create, Path.GetRandomFileName(), BSA_MAX_SIZE, MemoryMappedFileAccess.ReadWrite))
             {
-                var archFlags = reuseAttributes ? _readHeader.archiveFlags :
-                    ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles
-                    | (Settings.DefaultCompressed ? ArchiveFlags.Compressed : 0)
-                    | (Settings.BStringPrefixed ? ArchiveFlags.BStringPrefixed : 0);
-
-                var header = new BSAHeader
+                header.field = BSA_GREET;
+                header.version = FALLOUT_VERSION;
+                header.offset = HEADER_OFFSET;
+                if (recreate)
                 {
-                    field = BSA_GREET,
-                    version = FALLOUT_VERSION,
-                    offset = HEADER_OFFSET,
-                    archiveFlags = archFlags,
-                    folderCount = (uint)this.Count(),
-                    fileCount = (uint)allFileNames.Count,
-                    totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
-                    totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
-                    fileFlags = reuseAttributes ? _readHeader.fileFlags : CreateFileFlags(allFileNames)
-                };
-
-                writer.WriteStruct<BSAHeader>(header);
-
-                var orderedFolders =
-                    (from folder in this //presorted
-                     let record = CreateFolderRecord(folder)
-                     //orderby record.hash
-                     select new { folder, record }).ToList();
-
-                orderedFolders.ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
-
-                orderedFolders.ForEach(a => WriteFileRecordBlock(writer, a.folder, header.totalFileNameLength));
-
-                allFileNames.ForEach(fileName => writer.WriteCString(fileName));
-
-                allFiles.ForEach(file =>
+                    header.archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
+                    if (Settings.DefaultCompressed)
+                        header.archiveFlags |= ArchiveFlags.Compressed;
+                    if (Settings.BStringPrefixed)
+                        header.archiveFlags |= ArchiveFlags.BStringPrefixed;
+                }
+                header.folderCount = (uint)this.Count();
+                header.fileCount = (uint)allFileNames.Count;
+                header.totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1);
+                header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
+                if (recreate)
                 {
-                    _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
-                    writer.Write(file.GetSaveData());
-                });
+                    header.fileFlags = CreateFileFlags(allFileNames);
+                }
+
+                uint offset = 0;
+                using (var writer = mmf.ToWriter<BSAHeader>(offset))
+                    header.Write(writer);
+                offset += HEADER_OFFSET;
+
+                var orderedFolders = this.Select(folder => new { folder, record = CreateFolderRecord(folder) }).ToList();
+
+                orderedFolders.ForEach(a => WriteFolderRecord(mmf, ref offset, a.folder, a.record));
+
+                orderedFolders.ForEach(a => WriteFileRecordBlock(mmf, ref offset, a.folder, header.totalFileNameLength));
+
+                using (var writer = mmf.ToWriter(offset, header.totalFileNameLength))
+                    allFileNames.ForEach(fileName => writer.WriteCString(fileName));
+                offset += header.totalFileNameLength;
+
+                allFiles.ForEach(file => WriteFileBlock(mmf, ref offset, file));
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
                 var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
                 var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets);
 
-                completeOffsets.ToList()
+                completeOffsets
+                    .ToList()
                     .ForEach(kvp =>
                     {
-                        writer.BaseStream.Seek(kvp.Key, SeekOrigin.Begin);
-                        writer.Write(kvp.Value);
+                        using (var writer = mmf.ToWriter(kvp.Key, sizeof(uint)))
+                            writer.Write(kvp.Value);
                     });
             }
+        }
+
+        private void WriteFileBlock(MemoryMappedFile mmf, ref uint offset, BSAFile file)
+        {
+            _fileRecordOffsetsB.Add(file, offset);
+
+            var saveBytes = file.GetSaveData();
+            using (var writer = mmf.ToWriter(offset, saveBytes.LongLength))
+                writer.Write(saveBytes);
+
+            offset += (uint)saveBytes.LongLength;
         }
 
         private FolderRecord CreateFolderRecord(BSAFolder folder)
@@ -217,10 +235,15 @@ namespace BSAsharp
             };
         }
 
-        private void WriteFolderRecord(BinaryWriter writer, BSAFolder folder, FolderRecord rec)
+        private void WriteFolderRecord(MemoryMappedFile mmf, ref uint offset, BSAFolder folder, FolderRecord rec)
         {
-            _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
-            writer.WriteStruct(rec);
+            using (var writer = mmf.ToWriter(offset, SIZE_RECORD))
+            {
+                _folderRecordOffsetsA.Add(folder, offset + SIZE_RECORD_OFFSET);
+                rec.Write(writer);
+
+                offset += SIZE_RECORD;
+            }
         }
 
         private FileRecord CreateFileRecord(BSAFile file)
@@ -233,17 +256,23 @@ namespace BSAsharp
             };
         }
 
-        private void WriteFileRecordBlock(BinaryWriter writer, BSAFolder folder, uint totalFileNameLength)
+        private void WriteFileRecordBlock(MemoryMappedFile mmf, ref uint offset, BSAFolder folder, uint totalFileNameLength)
         {
-            _folderRecordOffsetsB.Add(folder, (uint)writer.BaseStream.Position + totalFileNameLength);
-            writer.WriteBZString(folder.Path);
-
-            foreach (var file in folder)
+            var size = (folder.Count * SIZE_RECORD) + (BinaryExtensions.Windows1252.GetByteCount(folder.Path) + 2); //length byte + null byte
+            using (var writer = mmf.ToWriter(offset, size))
             {
-                var record = CreateFileRecord(file);
+                _folderRecordOffsetsB.Add(folder, offset + totalFileNameLength);
+                writer.WriteBZString(folder.Path);
 
-                _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
-                writer.WriteStruct(record);
+                foreach (var file in folder)
+                {
+                    var record = CreateFileRecord(file);
+
+                    _fileRecordOffsetsA.Add(file, offset + (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
+                    record.Write(writer);
+                }
+
+                offset += (uint)size;
             }
         }
 

@@ -1,10 +1,17 @@
-﻿using System;
+﻿//#define SEVENZIPSHARP
+#define SHARPZIPLIB
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+#if SHARPZIPLIB
 using ICSharpCode.SharpZipLib.Zip.Compression;
 using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
+#endif
+#if SEVENZIPSHARP
+using SevenZip;
+#endif
 
 namespace BSAsharp
 {
@@ -38,7 +45,9 @@ namespace BSAsharp
 
         private static Stream MakeZlibInflateStream(Stream inStream, bool skipHeader)
         {
-            return new InflaterInputStream(inStream, new Inflater(skipHeader));
+#if SHARPZIPLIB
+           return new InflaterInputStream(inStream, new Inflater(skipHeader));
+#endif
         }
 
         public static byte[] Compress(Stream decompressedStream, int level = 6)
@@ -63,7 +72,9 @@ namespace BSAsharp
         {
             //you can substitute any zlib-compatible deflater here
             //gzip, zopfli, etc
+#if SHARPZIPLIB
             return new DeflaterOutputStream(outStream, new Deflater(level));
+#endif
         }
     }
 }

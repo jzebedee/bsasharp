@@ -153,17 +153,11 @@ namespace BSAsharp
             Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
             File.Delete(outBsa);
 
-            var mapName = Path.GetRandomFileName();
-            using (var mmf = MemoryMappedFile.CreateNew(mapName, BSA_MAX_SIZE, MemoryMappedFileAccess.ReadWrite))
-            {
-                var makeTask = Task.Factory.StartNew(() => SaveToMMF(mmf, recreate));
-                var saveTask = makeTask.ContinueWith(t => CopyToFile(mmf, t.Result, outBsa));
-
-                saveTask.Wait();
-            }
+            using (var stream = File.OpenWrite(outBsa))
+                SaveTo(stream, recreate);
         }
 
-        private long SaveToMMF(MemoryMappedFile mmf, bool recreate)
+        private void SaveTo(Stream stream, bool recreate)
         {
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
@@ -190,8 +184,6 @@ namespace BSAsharp
                 header.fileFlags = CreateFileFlags(allFileNames);
             }
 
-            long finalPos;
-            using (var stream = mmf.CreateViewStream())
             using (var writer = new BinaryWriter(stream))
             {
                 header.Write(writer);
@@ -210,25 +202,15 @@ namespace BSAsharp
 
                 allFiles.ForEach(file => WriteFileBlock(writer, file));
 
-                finalPos = writer.BaseStream.Position;
-            }
+                var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
+                var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
+                var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets).ToList();
 
-            var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
-            var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
-            var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets).ToList();
-
-            using (var acc = mmf.CreateViewAccessor())
-                completeOffsets.ForEach(kvp => acc.Write(kvp.Key, kvp.Value));
-
-            return finalPos;
-        }
-
-        private void CopyToFile(MemoryMappedFile mmf, long length, string filePath)
-        {
-            using (var fileStream = File.OpenWrite(filePath))
-            using (var mapStream = mmf.CreateViewStream(0, length, MemoryMappedFileAccess.Read))
-            {
-                mapStream.CopyTo(fileStream);
+                completeOffsets.ForEach(kvp =>
+                {
+                    writer.BaseStream.Seek(kvp.Key, SeekOrigin.Begin);
+                    writer.Write(kvp.Value);
+                });
             }
         }
 

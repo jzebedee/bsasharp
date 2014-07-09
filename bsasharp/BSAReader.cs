@@ -76,11 +76,18 @@ namespace BSAsharp
                 .SelectMany(kvp =>
                     kvp.Value.Select(record => new { path = kvp.Key, record }))
                 .Zip(fileNames, (a, fn) => new { a.path, fn, a.record });
-            var fileLookup = pathedFiles.ToLookup(a => a.path, a => new { a.fn, a.record });
 
+            var fileLookup = pathedFiles.ToLookup(a => a.path, a => new { a.fn, a.record });
             return
                 from g in fileLookup
-                let bsaFiles = g.Select(a => new BSAFile(g.Key, a.fn, Settings, a.record, (off, len) => _mmf.ToStream(a.record.offset + off, len)))
+                let bsaFiles =
+                    g.Select(a =>
+                        new BSAFile(
+                            g.Key,
+                            a.fn,
+                            Settings,
+                            a.record,
+                            (off, len) => _mmf.ToStream(a.record.offset + off, len)))
                 select new BSAFolder(g.Key, bsaFiles);
         }
 

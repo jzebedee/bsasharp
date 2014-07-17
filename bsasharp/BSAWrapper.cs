@@ -162,7 +162,11 @@ namespace BSAsharp
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            var header = recreate ? new BSAHeader() : _readHeader;
+            BSAHeader header;
+            if (recreate)
+                header = new BSAHeader();
+            else
+                header = _readHeader;
 
             header.field = BSA_GREET;
             header.version = FALLOUT_VERSION;

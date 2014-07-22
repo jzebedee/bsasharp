@@ -63,49 +63,34 @@ namespace BSAsharp.Extensions
             return newBuf;
         }
 
-        public static Stream ToStream(this MemoryMappedFile mmf, long offset, long size, MemoryMappedFileAccess rights = MemoryMappedFileAccess.ReadWrite)
+        internal static Stream ToStream(this MemoryMappedFile mmf, long offset, long size, MemoryMappedFileAccess rights)
         {
             return mmf.CreateViewStream(offset, size, rights);
         }
 
-        public static Stream ToStream<T>(this MemoryMappedFile mmf, long offset, MemoryMappedFileAccess rights = MemoryMappedFileAccess.ReadWrite)
+        internal static Stream ToStream<T>(this MemoryMappedFile mmf, long offset, MemoryMappedFileAccess rights)
         {
             return ToStream(mmf, offset, Marshal.SizeOf(typeof(T)), rights);
         }
 
-        public static Stream ToStreamBulk<T>(this MemoryMappedFile mmf, long offset, uint count, MemoryMappedFileAccess rights = MemoryMappedFileAccess.ReadWrite)
+        internal static Stream ToStreamBulk<T>(this MemoryMappedFile mmf, long offset, uint count, MemoryMappedFileAccess rights)
         {
             return ToStream(mmf, offset, Marshal.SizeOf(typeof(T)) * count, rights);
         }
 
-        public static BinaryReader ToReader<T>(this MemoryMappedFile mmf, long offset)
+        internal static BinaryReader ToReader<T>(this MemoryMappedFile mmf, long offset)
         {
             return new BinaryReader(ToStream<T>(mmf, offset, MemoryMappedFileAccess.Read));
         }
 
-        public static BinaryReader ToReaderBulk<T>(this MemoryMappedFile mmf, long offset, uint count)
+        internal static BinaryReader ToReaderBulk<T>(this MemoryMappedFile mmf, long offset, uint count)
         {
             return new BinaryReader(ToStreamBulk<T>(mmf, offset, count, MemoryMappedFileAccess.Read));
         }
 
-        public static BinaryReader ToReader(this MemoryMappedFile mmf, long offset, long size)
+        internal static BinaryReader ToReader(this MemoryMappedFile mmf, long offset, long size)
         {
             return new BinaryReader(ToStream(mmf, offset, size, MemoryMappedFileAccess.Read));
-        }
-
-        public static BinaryWriter ToWriter<T>(this MemoryMappedFile mmf, long offset)
-        {
-            return new BinaryWriter(ToStream<T>(mmf, offset, MemoryMappedFileAccess.Write));
-        }
-
-        public static BinaryWriter ToWriter<T>(this MemoryMappedFile mmf, long offset, uint count)
-        {
-            return new BinaryWriter(ToStreamBulk<T>(mmf, offset, count, MemoryMappedFileAccess.Write));
-        }
-
-        public static BinaryWriter ToWriter(this MemoryMappedFile mmf, long offset, long size)
-        {
-            return new BinaryWriter(ToStream(mmf, offset, size, MemoryMappedFileAccess.Write));
         }
     }
 }

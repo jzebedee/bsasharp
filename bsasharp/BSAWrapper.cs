@@ -40,7 +40,7 @@ namespace BSAsharp
         /// </summary>
         /// <param name="bsaPath">The path of the file to open</param>
         public BSAWrapper(string bsaPath, CompressionOptions Options = null)
-            : this(MemoryMappedFile.CreateFromFile(bsaPath), Options ?? new CompressionOptions())
+            : this(MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, null, 0L, MemoryMappedFileAccess.Read), Options ?? new CompressionOptions())
         {
         }
         /// <summary>

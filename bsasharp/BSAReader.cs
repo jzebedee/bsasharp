@@ -87,7 +87,7 @@ namespace BSAsharp
                             a.fn,
                             Settings,
                             a.record,
-                            (off, len) => _mmf.ToStream(a.record.offset + off, len)))
+                            (off, len) => _mmf.ToStream(a.record.offset + off, len, MemoryMappedFileAccess.Read)))
                 select new BSAFolder(g.Key, bsaFiles);
         }
 

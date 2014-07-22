@@ -78,7 +78,7 @@ namespace BSAsharp
             this._bsaReader = BSAReader;
         }
         private BSAWrapper(IEnumerable<BSAFolder> collection)
-            : base(collection, HashComparer.Instance)
+            : base(collection, BSAHashComparer.Instance)
         {
         }
         ~BSAWrapper()

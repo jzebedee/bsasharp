@@ -5,13 +5,13 @@ using System.Text;
 
 namespace BSAsharp
 {
-    class HashComparer : IComparer<IHashed>
+    sealed class BSAHashComparer : IComparer<IHashed>
     {
         //Comparisons are based ONLY on the hash, which is created only
         //from the filename in BSAFiles and the path in BSAFolders.
         //Don't try to use SortedSet<T> features OUTSIDE of the folder!!
-        public static readonly HashComparer Instance = new HashComparer();
-        private HashComparer()
+        public static readonly BSAHashComparer Instance = new BSAHashComparer();
+        private BSAHashComparer()
         {
             
         }

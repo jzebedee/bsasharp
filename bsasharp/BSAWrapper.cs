@@ -17,13 +17,13 @@ namespace BSAsharp
 {
     public class BSAWrapper : SortedSet<BSAFolder>, IDisposable
     {
-        public const int
+        internal const int
             FALLOUT_VERSION = 0x68,
             HEADER_OFFSET = 0x24, //sizeof(BSAHeader)
             SIZE_RECORD = 0x10, //sizeof(FolderRecord) or sizeof(FileRecord)
             SIZE_RECORD_OFFSET = 0xC, //SIZE_RECORD - sizeof(uint)
             BSA_GREET = 0x415342; //'B','S','A','\0'
-        public const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
+        internal const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
 
         private readonly BSAHeader _readHeader;
 

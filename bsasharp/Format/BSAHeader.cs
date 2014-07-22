@@ -7,9 +7,9 @@ using System.Text;
 
 namespace BSAsharp.Format
 {
-    public struct BSAHeader
+    internal struct BSAHeader
     {
-        public BSAHeader(BinaryReader reader)
+        internal BSAHeader(BinaryReader reader)
         {
             field = reader.ReadUInt32();
             version = reader.ReadUInt32();
@@ -21,7 +21,7 @@ namespace BSAsharp.Format
             totalFileNameLength = reader.ReadUInt32();
             fileFlags = (FileFlags)reader.ReadUInt32();
         }
-        public void Write(BinaryWriter writer)
+        internal void Write(BinaryWriter writer)
         {
             writer.Write(field);
             writer.Write(version);

@@ -7,12 +7,10 @@ namespace BSAsharp
 {
     public class CompressionOptions
     {
-        public const CompressionStrategy DEFAULT_STRATEGY = CompressionStrategy.Size;
-
         public CompressionStrategy Strategy { get; set; }
         public Dictionary<string, int> ExtensionCompressionLevel { get; set; }
 
-        public CompressionOptions(CompressionStrategy Strategy = DEFAULT_STRATEGY)
+        public CompressionOptions(CompressionStrategy Strategy = CompressionStrategy.Safe)
         {
             this.Strategy = Strategy;
             ExtensionCompressionLevel = new Dictionary<string, int>();

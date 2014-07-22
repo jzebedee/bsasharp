@@ -18,15 +18,14 @@ namespace BSAsharp
     {
         public string Path { get; private set; }
 
-        private readonly Lazy<ulong> _hash;
-        public ulong Hash { get { return _hash.Value; } }
+        public ulong Hash { get; private set; }
 
         public BSAFolder(string path, IEnumerable<BSAFile> children = null)
             : this(children)
         {
             //Must be all lower case, and use backslash as directory delimiter
             this.Path = BSAFile.FixPath(path);
-            this._hash = new Lazy<ulong>(() => Util.CreateHash(Path, ""));
+            this.Hash = Util.CreateHash(Path, "");
         }
         private BSAFolder(IEnumerable<BSAFile> collection)
             : base(collection ?? new SortedSet<BSAFile>(), HashComparer.Instance)

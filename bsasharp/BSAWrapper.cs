@@ -11,6 +11,7 @@ using System.Threading;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace BSAsharp
 {
@@ -20,9 +21,9 @@ namespace BSAsharp
             FALLOUT_VERSION = 0x68,
             HEADER_OFFSET = 0x24, //sizeof(BSAHeader)
             SIZE_RECORD = 0x10, //sizeof(FolderRecord) or sizeof(FileRecord)
-            SIZE_RECORD_OFFSET = 0xC; //SIZE_RECORD - sizeof(uint)
-
-        static readonly char[] BSA_GREET = "BSA\0".ToCharArray();
+            SIZE_RECORD_OFFSET = 0xC, //SIZE_RECORD - sizeof(uint)
+            BSA_GREET = 0x415342; //'B','S','A','\0'
+        public const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
 
         private readonly BSAHeader _readHeader;
 
@@ -64,11 +65,11 @@ namespace BSAsharp
         //wtf C#
         //please get real ctor overloads someday
         private BSAWrapper(MemoryMappedFile BSAMap, CompressionOptions Options)
-            : this(new MemoryMappedBSAReader(BSAMap, Options))
+            : this(new BSAReader(BSAMap, Options))
         {
             this._bsaMap = BSAMap;
         }
-        private BSAWrapper(MemoryMappedBSAReader BSAReader)
+        private BSAWrapper(BSAReader BSAReader)
             : this(BSAReader.Read())
         {
             this._readHeader = BSAReader.Header;
@@ -85,7 +86,7 @@ namespace BSAsharp
             Dispose(false);
         }
 
-        private readonly MemoryMappedBSAReader _bsaReader;
+        private readonly BSAReader _bsaReader;
         private readonly MemoryMappedFile _bsaMap;
 
         protected virtual void Dispose(bool disposing)
@@ -142,69 +143,85 @@ namespace BSAsharp
 
         public void Save(string outBsa, bool recreate = false)
         {
-            bool reuseAttributes = _readHeader != null && !recreate;
-
             _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>();
             _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
 
             _fileRecordOffsetsA = new Dictionary<BSAFile, uint>();
             _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
 
+            outBsa = Path.GetFullPath(outBsa);
+            Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
+            File.Delete(outBsa);
+
+            using (var stream = File.OpenWrite(outBsa))
+                SaveTo(stream, recreate);
+        }
+
+        private void SaveTo(Stream stream, bool recreate)
+        {
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            File.Delete(outBsa);
-            using (var writer = new BinaryWriter(File.OpenWrite(outBsa)))
+            BSAHeader header;
+            if (recreate)
+                header = new BSAHeader();
+            else
+                header = _readHeader;
+
+            header.field = BSA_GREET;
+            header.version = FALLOUT_VERSION;
+            header.offset = HEADER_OFFSET;
+            if (recreate)
             {
-                var archFlags = reuseAttributes ? _readHeader.archiveFlags :
-                    ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles
-                    | (Settings.DefaultCompressed ? ArchiveFlags.Compressed : 0)
-                    | (Settings.BStringPrefixed ? ArchiveFlags.BStringPrefixed : 0);
+                header.archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
+                if (Settings.DefaultCompressed)
+                    header.archiveFlags |= ArchiveFlags.Compressed;
+                if (Settings.BStringPrefixed)
+                    header.archiveFlags |= ArchiveFlags.BStringPrefixed;
+            }
+            header.folderCount = (uint)this.Count();
+            header.fileCount = (uint)allFileNames.Count;
+            header.totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1);
+            header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
+            if (recreate)
+            {
+                header.fileFlags = CreateFileFlags(allFileNames);
+            }
 
-                var header = new BSAHeader
-                {
-                    field = BSA_GREET,
-                    version = FALLOUT_VERSION,
-                    offset = HEADER_OFFSET,
-                    archiveFlags = archFlags,
-                    folderCount = (uint)this.Count(),
-                    fileCount = (uint)allFileNames.Count,
-                    totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1),
-                    totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1),
-                    fileFlags = reuseAttributes ? _readHeader.fileFlags : CreateFileFlags(allFileNames)
-                };
+            using (var writer = new BinaryWriter(stream))
+            {
+                header.Write(writer);
 
-                writer.WriteStruct<BSAHeader>(header);
-
-                var orderedFolders =
-                    (from folder in this //presorted
-                     let record = CreateFolderRecord(folder)
-                     //orderby record.hash
-                     select new { folder, record }).ToList();
-
+                var orderedFolders = this.Select(folder => new { folder, record = CreateFolderRecord(folder) }).ToList();
                 orderedFolders.ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
 
+#if PARALLEL
+                //parallel pump the files, as checking RecordSize may
+                //trigger a decompress/recompress, depending on settings
+                allFiles.AsParallel().ForAll(file => CreateFileRecord(file));
+#endif
                 orderedFolders.ForEach(a => WriteFileRecordBlock(writer, a.folder, header.totalFileNameLength));
 
                 allFileNames.ForEach(fileName => writer.WriteCString(fileName));
 
-                allFiles.ForEach(file =>
-                {
-                    _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
-                    writer.Write(file.GetSaveData());
-                });
+                allFiles.ForEach(file => WriteFileBlock(writer, file));
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
                 var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
-                var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets);
+                var completeOffsets = folderRecordOffsets.Concat(fileRecordOffsets).ToList();
 
-                completeOffsets.ToList()
-                    .ForEach(kvp =>
-                    {
-                        writer.BaseStream.Seek(kvp.Key, SeekOrigin.Begin);
-                        writer.Write(kvp.Value);
-                    });
+                completeOffsets.ForEach(kvp =>
+                {
+                    writer.BaseStream.Seek(kvp.Key, SeekOrigin.Begin);
+                    writer.Write(kvp.Value);
+                });
             }
+        }
+
+        private void WriteFileBlock(BinaryWriter writer, BSAFile file)
+        {
+            _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
+            writer.Write(file.GetSaveData());
         }
 
         private FolderRecord CreateFolderRecord(BSAFolder folder)
@@ -220,7 +237,7 @@ namespace BSAsharp
         private void WriteFolderRecord(BinaryWriter writer, BSAFolder folder, FolderRecord rec)
         {
             _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
-            writer.WriteStruct(rec);
+            rec.Write(writer);
         }
 
         private FileRecord CreateFileRecord(BSAFile file)
@@ -243,7 +260,7 @@ namespace BSAsharp
                 var record = CreateFileRecord(file);
 
                 _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
-                writer.WriteStruct(record);
+                record.Write(writer);
             }
         }
 

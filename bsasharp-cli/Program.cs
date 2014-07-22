@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using BSAsharp;
 
-namespace BSAsharp_debug
+namespace BSAsharp_cli
 {
     class Program
     {
@@ -16,7 +16,7 @@ namespace BSAsharp_debug
             if (args.Length == 0 || args.Length % 2 != 0)
             {
                 Console.WriteLine("Use:");
-                Console.WriteLine("bsasharp-debug <args>");
+                Console.WriteLine("bsasharp-cli <args>");
                 Console.ReadKey();
                 return;
             }
@@ -50,27 +50,35 @@ namespace BSAsharp_debug
 
             Trace.Assert(packFolder != null ^ inPath != null);
 
-            IEnumerable<BSAWrapper> BSAs = null;
-            if (inPath != null)
+#if DEBUG
+            int tests = 1;// 15;
+            long[] ticks = new long[tests];
+            for (int i = 0; i < tests; i++)
             {
-                if (File.Exists(inPath))
-                    BSAs = new[] { new BSAWrapper(inPath, new CompressionOptions(CompressionStrategy.Size | CompressionStrategy.Unsafe)) };
-                else if (Directory.Exists(inPath))
-                    BSAs = Directory.EnumerateFiles(inPath, "*.bsa", SearchOption.TopDirectoryOnly).Select(bsapath => new BSAWrapper(bsapath));
-            }
-            else if (packFolder != null)
-                BSAs = new[] { new BSAWrapper(packFolder, new ArchiveSettings(true, false, new CompressionOptions(CompressionStrategy.Size))) };
-            Trace.Assert(BSAs != null);
-
-            foreach (var wrapper in BSAs)
-            {
-                var watch = new Stopwatch();
-                try
+#endif
+                IEnumerable<BSAWrapper> BSAs = null;
+                if (inPath != null)
                 {
-                    watch.Start();
+                    if (File.Exists(inPath))
+                        BSAs = new[] { new BSAWrapper(inPath, new CompressionOptions(CompressionStrategy.Size | CompressionStrategy.Unsafe)) };
+                    else if (Directory.Exists(inPath))
+                        BSAs = Directory.EnumerateFiles(inPath, "*.bsa", SearchOption.TopDirectoryOnly).Select(bsapath => new BSAWrapper(bsapath));
+                }
+                else if (packFolder != null)
+                    BSAs = new[] { new BSAWrapper(packFolder, new ArchiveSettings(true, false, new CompressionOptions(CompressionStrategy.Size))) };
+                Trace.Assert(BSAs != null);
 
-                    using (wrapper)
+                foreach (var wrapper in BSAs)
+                {
+                    var watch = new Stopwatch();
+                    try
                     {
+                        watch.Start();
+
+                        using (wrapper)
+                        {
+#if DEBUG
+#else
                         foreach (var folder in wrapper)
                         {
                             Console.WriteLine(folder);
@@ -81,24 +89,37 @@ namespace BSAsharp_debug
                             }
                             //Console.ReadKey();
                         }
+#endif
 
-                        if (unpackFolder != null)
-                            wrapper.Extract(unpackFolder);
-                        if (outFile != null)
-                            wrapper.Save(outFile);
+                            if (unpackFolder != null)
+                                wrapper.Extract(unpackFolder);
+                            if (outFile != null)
+                                wrapper.Save(outFile);
+                        }
                     }
-                }
-                finally
-                {
-                    watch.Stop();
-                }
+                    finally
+                    {
+                        watch.Stop();
+#if DEBUG
+                        ticks[i] = watch.ElapsedTicks;
+#endif
+                    }
 
+#if DEBUG
+#else
                 Console.WriteLine();
-                Console.WriteLine("Complete in " + watch.Elapsed.ToString());
+#endif
+                    Console.WriteLine("Complete in " + watch.Elapsed.ToString());
+                }
+#if DEBUG
             }
+#endif
 
             Console.WriteLine();
             Console.WriteLine("All operations complete");
+#if DEBUG
+            Console.WriteLine("Average time: " + TimeSpan.FromTicks((long)ticks.Average()));
+#endif
             Console.ReadKey();
         }
 

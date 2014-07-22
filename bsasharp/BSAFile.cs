@@ -285,11 +285,6 @@ namespace BSAsharp
             using (var msOut = GetSaveStream())
                 return msOut.ToArray();
         }
-        private byte[] GetRawSaveData()
-        {
-            using (var msOut = GetRawSaveStream())
-                return msOut.ToArray();
-        }
 
         public byte[] GetContents(bool extract, bool force = false)
         {

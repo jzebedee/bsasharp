@@ -32,7 +32,7 @@ namespace BSAsharp.Extensions
 
         public static void WriteBZString(this BinaryWriter writer, string toWrite)
         {
-            WriteBString(writer, toWrite.Last() == '\0' ? toWrite : toWrite + '\0');
+            WriteBString(writer, toWrite.Last() == '\0' ? toWrite : toWrite + "\0");
         }
 
         public static string ReadCString(this BinaryReader reader)
@@ -47,7 +47,7 @@ namespace BSAsharp.Extensions
 
         public static void WriteCString(this BinaryWriter writer, string toWrite)
         {
-            var bytes = Windows1252.GetBytes(toWrite + '\0');
+            var bytes = Windows1252.GetBytes(toWrite + "\0");
             writer.Write(bytes);
         }
 

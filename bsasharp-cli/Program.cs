@@ -51,7 +51,7 @@ namespace BSAsharp_cli
             Trace.Assert(packFolder != null ^ inPath != null);
 
 #if DEBUG
-            int tests = 15;
+            int tests = 1;// 15;
             long[] ticks = new long[tests];
             for (int i = 0; i < tests; i++)
             {

@@ -160,11 +160,10 @@ namespace BSAsharp
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            BSAHeader header;
-            if (recreate)
-                header = new BSAHeader();
-            else
-                header = _readHeader;
+            BSAHeader header = recreate ? new BSAHeader() : _readHeader;
+            if (header.Equals(default(BSAHeader)))
+                //this needs to be set, otherwise we won't write archive information
+                recreate = true;
 
             header.field = BSA_GREET;
             header.version = FALLOUT_VERSION;
@@ -196,7 +195,7 @@ namespace BSAsharp
 #if PARALLEL
                 //parallel pump the files, as checking RecordSize may
                 //trigger a decompress/recompress, depending on settings
-                allFiles.AsParallel().ForAll(file => CreateFileRecord(file));
+                allFiles.AsParallel().ForAll(file => file.Cache());
 #endif
                 orderedFolders.ForEach(a => WriteFileRecordBlock(writer, a.folder, header.totalFileNameLength));
 

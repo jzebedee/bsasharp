@@ -89,7 +89,7 @@ namespace BSAsharp
             UpdateData(data, inputCompressed);
         }
 
-        internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<uint, uint, Stream> createStream)
+        internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<uint, uint, BinaryReader> createReader)
             : this(path, name, settings, baseRec)
         {
             if (Size == 0)
@@ -101,8 +101,7 @@ namespace BSAsharp
             uint offset = _settings.BStringPrefixed ? (uint)Filename.Length + 1 : 0;
             if (IsCompressed)
             {
-                using (var osStream = createStream(offset, sizeof(uint)))
-                using (var osReader = new BinaryReader(osStream))
+                using (var osReader = createReader(offset, sizeof(uint)))
                 {
                     OriginalSize = osReader.ReadUInt32();
                     offset += sizeof(uint);
@@ -112,13 +111,8 @@ namespace BSAsharp
             _lazyData = new Lazy<byte[]>(() =>
             {
                 var dataSize = Size - offset;
-                using (var stream = createStream(offset, dataSize))
-                {
-                    var buf = new byte[dataSize];
-                    Trace.Assert(stream.Read(buf, 0, (int)dataSize) == dataSize);
-
-                    return buf;
-                }
+                using (var reader = createReader(offset, dataSize))
+                    return reader.ReadBytes((int)dataSize);
             });
         }
 

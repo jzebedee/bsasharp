@@ -15,7 +15,11 @@ namespace BSAsharp.Extensions
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();
+            return ReadBString(reader, length, stripEnd);
+        }
 
+        public static string ReadBString(this BinaryReader reader, byte length, bool stripEnd = false)
+        {
             var bytes = reader.ReadBytes(length);
             var bstring = Windows1252.GetString(bytes);
 
@@ -66,26 +70,6 @@ namespace BSAsharp.Extensions
         internal static Stream ToStream(this MemoryMappedFile mmf, long offset, long size, MemoryMappedFileAccess rights)
         {
             return mmf.CreateViewStream(offset, size, rights);
-        }
-
-        internal static Stream ToStream<T>(this MemoryMappedFile mmf, long offset, MemoryMappedFileAccess rights)
-        {
-            return ToStream(mmf, offset, Marshal.SizeOf(typeof(T)), rights);
-        }
-
-        internal static Stream ToStreamBulk<T>(this MemoryMappedFile mmf, long offset, uint count, MemoryMappedFileAccess rights)
-        {
-            return ToStream(mmf, offset, Marshal.SizeOf(typeof(T)) * count, rights);
-        }
-
-        internal static BinaryReader ToReader<T>(this MemoryMappedFile mmf, long offset)
-        {
-            return new BinaryReader(ToStream<T>(mmf, offset, MemoryMappedFileAccess.Read));
-        }
-
-        internal static BinaryReader ToReaderBulk<T>(this MemoryMappedFile mmf, long offset, uint count)
-        {
-            return new BinaryReader(ToStreamBulk<T>(mmf, offset, count, MemoryMappedFileAccess.Read));
         }
 
         internal static BinaryReader ToReader(this MemoryMappedFile mmf, long offset, long size)

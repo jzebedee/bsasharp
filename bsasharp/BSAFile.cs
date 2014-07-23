@@ -35,7 +35,7 @@ namespace BSAsharp
             {
                 return IsCompressed ? _originalSize : Size;
             }
-            set
+            private set
             {
                 _originalSize = value;
             }
@@ -47,22 +47,6 @@ namespace BSAsharp
 
         private byte[] _readyData;
         private Lazy<byte[]> _lazyData;
-
-        private byte[] Data
-        {
-            get
-            {
-                if (_readyData == null)
-                {
-                    if (_lazyData != null)
-                        _readyData = _lazyData.Value;
-                    else
-                        return null;
-                }
-
-                return _readyData;
-            }
-        }
 
         private readonly ArchiveSettings _settings;
 
@@ -92,11 +76,8 @@ namespace BSAsharp
         internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<uint, uint, BinaryReader> createReader)
             : this(path, name, settings, baseRec)
         {
-            if (Size == 0)
-            {
+            if (Size == 0 || (Size <= 4 && IsCompressed))
                 _readyData = new byte[0];
-                return;
-            }
 
             uint offset = _settings.BStringPrefixed ? (uint)Filename.Length + 1 : 0;
             if (IsCompressed)
@@ -110,9 +91,8 @@ namespace BSAsharp
 
             _lazyData = new Lazy<byte[]>(() =>
             {
-                var dataSize = Size - offset;
-                using (var reader = createReader(offset, dataSize))
-                    return reader.ReadBytes((int)dataSize);
+                using (var reader = createReader(offset, Size - offset))
+                    return reader.ReadBytes((int)(Size - offset));
             });
         }
 
@@ -322,31 +302,20 @@ namespace BSAsharp
 
         private Stream GetDataStream()
         {
-            if (Data != null)
-                return new MemoryStream(Data);
-            //else if (_createStream != null)
-            //    return _createStream();
-
-            throw new InvalidOperationException("GetDataStream() had no data source");
+            return new MemoryStream(GetData());
         }
 
         private byte[] GetData()
         {
-            if (Data != null)
-                return Data;
+            if (_readyData == null)
+            {
+                if (_lazyData != null)
+                    _readyData = _lazyData.Value;
+                else
+                    throw new InvalidOperationException("GetData() had no data source");
+            }
 
-            //if (_createStream != null)
-            //{
-            //    using (var stream = _createStream())
-            //    {
-            //        _writtenData = new byte[stream.Length];
-            //        stream.Read(_writtenData, 0, _writtenData.Length);
-
-            //        return _writtenData;
-            //    }
-            //}
-
-            throw new InvalidOperationException("GetData() had no data source");
+            return _readyData;
         }
 
         private byte[] GetDeflatedData(bool force = false)

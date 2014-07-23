@@ -19,8 +19,6 @@ namespace BSAsharp
     {
         internal const int
             FALLOUT_VERSION = 0x68,
-            HEADER_OFFSET = 0x24, //sizeof(BSAHeader)
-            SIZE_RECORD = 0x10, //sizeof(FolderRecord) or sizeof(FileRecord)
             SIZE_RECORD_OFFSET = 0xC, //SIZE_RECORD - sizeof(uint)
             BSA_GREET = 0x415342; //'B','S','A','\0'
         internal const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
@@ -170,7 +168,7 @@ namespace BSAsharp
 
             header.field = BSA_GREET;
             header.version = FALLOUT_VERSION;
-            header.offset = HEADER_OFFSET;
+            header.offset = BSAHeader.Size;
             if (recreate)
             {
                 header.archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;

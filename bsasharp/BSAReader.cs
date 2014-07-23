@@ -42,20 +42,16 @@ namespace BSAsharp
             GC.SuppressFinalize(this);
         }
 
-        private uint GetBStringOffset(long offset)
+        private byte ReadByte(long offset)
         {
-            using (var lengthReader = _mmf.ToReader<byte>(offset))
-            {
-                return lengthReader.ReadByte() + 1u;
-            }
+            using (var reader = _mmf.ToReader(offset, sizeof(byte)))
+                return reader.ReadByte();
         }
 
         public IEnumerable<BSAFolder> Read()
         {
-            using (var reader = _mmf.ToReader<BSAHeader>(0))
-            {
+            using (var reader = _mmf.ToReader(0, BSAHeader.Size))
                 Header = new BSAHeader(reader);
-            }
 
             if (Header.version != BSAWrapper.FALLOUT_VERSION)
                 throw new NotImplementedException("Unsupported BSA version");
@@ -63,7 +59,7 @@ namespace BSAsharp
             Settings.BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
             Settings.DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
 
-            long offset = BSAWrapper.HEADER_OFFSET;
+            long offset = BSAHeader.Size;
             var folderDict = ReadFolders(ref offset, Header.folderCount);
             var fileNames = ReadFileNameBlocks(offset, Header.fileCount);
 
@@ -95,7 +91,7 @@ namespace BSAsharp
         {
             var folderDict = new Dictionary<string, IList<FileRecord>>();
 
-            using (var reader = _mmf.ToReaderBulk<FolderRecord>(offset, folderCount))
+            using (var reader = _mmf.ToReader(offset, folderCount * FolderRecord.Size))
             {
                 var folders = new List<FolderRecord>((int)folderCount);
                 for (int i = 0; i < folderCount; i++)
@@ -116,17 +112,19 @@ namespace BSAsharp
 
         protected IList<FileRecord> ReadFileRecordBlocks(ref long offset, uint count, out string folderName)
         {
-            var bstringLen = GetBStringOffset(offset);
+            var bstringLen = ReadByte(offset++);
             using (var nameReader = _mmf.ToReader(offset, bstringLen))
-                folderName = nameReader.ReadBString(true);
+                folderName = nameReader.ReadBString(bstringLen, true);
             offset += bstringLen;
 
             var files = new List<FileRecord>((int)count);
-            using (var reader = _mmf.ToReaderBulk<FileRecord>(offset, count))
+            using (var reader = _mmf.ToReader(offset, count * FileRecord.Size))
             {
-                offset += BSAWrapper.SIZE_RECORD * count;
+                offset += count * FileRecord.Size;
+
                 for (int i = 0; i < count; i++)
                     files.Add(new FileRecord(reader));
+
                 return files;
             }
         }

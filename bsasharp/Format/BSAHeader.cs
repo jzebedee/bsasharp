@@ -9,6 +9,8 @@ namespace BSAsharp.Format
 {
     internal struct BSAHeader
     {
+        internal const int Size = 0x24;
+
         internal BSAHeader(BinaryReader reader)
         {
             field = reader.ReadUInt32();

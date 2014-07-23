@@ -7,16 +7,17 @@ using System.Text;
 
 namespace BSAsharp.Format
 {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct FolderRecord //0x10
+    internal struct FolderRecord
     {
-        public FolderRecord(BinaryReader reader)
+        internal const int Size = 0x10;
+
+        internal FolderRecord(BinaryReader reader)
         {
             hash = reader.ReadUInt64();
             count = reader.ReadUInt32();
             offset = reader.ReadUInt32();
         }
-        public void Write(BinaryWriter writer)
+        internal void Write(BinaryWriter writer)
         {
             writer.Write(hash);
             writer.Write(count);

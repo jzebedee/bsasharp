@@ -7,17 +7,17 @@ using System.Text;
 
 namespace BSAsharp.Format
 {
-    [StructLayout(LayoutKind.Sequential)]
-    public class FileRecord
+    internal struct FileRecord
     {
-        public FileRecord(BinaryReader reader)
+        internal const int Size = 0x10;
+
+        internal FileRecord(BinaryReader reader)
         {
             hash = reader.ReadUInt64();
             size = reader.ReadUInt32();
             offset = reader.ReadUInt32();
         }
-        public FileRecord() { }
-        public void Write(BinaryWriter writer)
+        internal void Write(BinaryWriter writer)
         {
             writer.Write(hash);
             writer.Write(size);

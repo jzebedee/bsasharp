@@ -161,10 +161,6 @@ namespace BSAsharp
             ForceCompressionIfNeeded();
 
             uint baseSize = this.Size;
-            if (IsCompressed)
-                baseSize += sizeof(uint);
-            if (_settings.BStringPrefixed)
-                baseSize += (uint)Filename.Length + 1;
 
             bool setCompressBit = CheckCompressed(IsCompressed);
             if (setCompressBit)
@@ -199,24 +195,30 @@ namespace BSAsharp
 
         public void UpdateData(byte[] buf, bool inputCompressed, bool flipCompression = false)
         {
-            this._lazyData = null;
+            _lazyData = null;
 
             CheckCompressionSettings();
-            this.IsCompressed = CheckCompressed(flipCompression);
-            this._readyData = buf;
+            IsCompressed = CheckCompressed(flipCompression);
+            _readyData = buf;
 
             if (this.IsCompressed)
             {
                 if (!inputCompressed)
-                    this.OriginalSize = (uint)buf.Length;
-                this._readyData = GetDeflatedData(!inputCompressed);
+                    OriginalSize = (uint)buf.Length;
+                _readyData = GetDeflatedData(!inputCompressed);
             }
             else
             {
-                this._readyData = GetInflatedData(inputCompressed);
-                this.OriginalSize = (uint)_readyData.Length;
+                _readyData = GetInflatedData(inputCompressed);
+                OriginalSize = (uint)_readyData.Length;
             }
-            this.Size = (uint)_readyData.Length;
+
+            Size = (uint)_readyData.Length;
+            //d3c09556
+            if (IsCompressed)
+                Size += sizeof(uint);
+            if (_settings.BStringPrefixed)
+                Size += (uint)Filename.Length + 1;
         }
 
         private void ForceCompressionIfNeeded()

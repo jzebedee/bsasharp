@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace BSAsharp
 {
-    public class BSAWrapper : SortedSet<BSAFolder>, IDisposable
+    public class BSA : SortedSet<BSAFolder>, IDisposable
     {
         internal const int
             FALLOUT_VERSION = 0x68,
@@ -37,7 +37,7 @@ namespace BSAsharp
         /// Creates a new BSAWrapper instance around an existing BSA file
         /// </summary>
         /// <param name="bsaPath">The path of the file to open</param>
-        public BSAWrapper(string bsaPath, CompressionOptions Options = null)
+        public BSA(string bsaPath, CompressionOptions Options = null)
             : this(MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, null, 0L, MemoryMappedFileAccess.Read), Options ?? new CompressionOptions())
         {
         }
@@ -46,7 +46,7 @@ namespace BSAsharp
         /// </summary>
         /// <param name="packFolder">The path of the folder to pack</param>
         /// <param name="defaultCompressed">The default compression state for the archive</param>
-        public BSAWrapper(string packFolder, ArchiveSettings settings)
+        public BSA(string packFolder, ArchiveSettings settings)
             : this(settings)
         {
             Pack(packFolder);
@@ -54,7 +54,7 @@ namespace BSAsharp
         /// <summary>
         /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
         /// </summary>
-        public BSAWrapper(ArchiveSettings settings)
+        public BSA(ArchiveSettings settings)
             : this(new SortedSet<BSAFolder>())
         {
             this.Settings = settings;
@@ -62,12 +62,12 @@ namespace BSAsharp
 
         //wtf C#
         //please get real ctor overloads someday
-        private BSAWrapper(MemoryMappedFile BSAMap, CompressionOptions Options)
+        private BSA(MemoryMappedFile BSAMap, CompressionOptions Options)
             : this(new BSAReader(BSAMap, Options))
         {
             this._bsaMap = BSAMap;
         }
-        private BSAWrapper(BSAReader BSAReader)
+        private BSA(BSAReader BSAReader)
             : this(BSAReader.Read())
         {
             this._readHeader = BSAReader.Header;
@@ -75,11 +75,11 @@ namespace BSAsharp
 
             this._bsaReader = BSAReader;
         }
-        private BSAWrapper(IEnumerable<BSAFolder> collection)
+        private BSA(IEnumerable<BSAFolder> collection)
             : base(collection, BSAHashComparer.Instance)
         {
         }
-        ~BSAWrapper()
+        ~BSA()
         {
             Dispose(false);
         }

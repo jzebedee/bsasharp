@@ -125,18 +125,10 @@ namespace BSAsharp
                 .ForEach(folder => Add(folder));
         }
 
-        public void Extract(string outFolder)
+        public void Unpack(string outFolder)
         {
             foreach (var folder in this)
-            {
-                Directory.CreateDirectory(Path.Combine(outFolder, folder.Path));
-
-                foreach (var file in folder)
-                {
-                    var filePath = Path.Combine(outFolder, file.Filename);
-                    File.WriteAllBytes(filePath, file.GetContents(true));
-                }
-            }
+                folder.Unpack(outFolder);
         }
 
         public void Save(string outBsa, bool recreate = false)

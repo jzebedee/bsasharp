@@ -90,9 +90,8 @@ namespace BSAsharp_cli
                             //Console.ReadKey();
                         }
 #endif
-
                             if (unpackFolder != null)
-                                wrapper.Extract(unpackFolder);
+                                wrapper.Unpack(unpackFolder);
                             if (outFile != null)
                                 wrapper.Save(outFile);
                         }

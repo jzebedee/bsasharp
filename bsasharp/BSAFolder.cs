@@ -7,6 +7,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.IO;
 
 namespace BSAsharp
 {
@@ -30,6 +31,19 @@ namespace BSAsharp
         private BSAFolder(IEnumerable<BSAFile> collection)
             : base(collection ?? new SortedSet<BSAFile>(), BSAHashComparer.Instance)
         {
+        }
+
+        public void Unpack(string outFolder)
+        {
+            var outPath = System.IO.Path.Combine(outFolder, Path);
+            if (!Directory.Exists(outPath))
+                Directory.CreateDirectory(outPath);
+
+            foreach (var file in this)
+            {
+                var filePath = System.IO.Path.Combine(outFolder, file.Filename);
+                File.WriteAllBytes(filePath, file.GetContents(true));
+            }
         }
 
         public override string ToString()

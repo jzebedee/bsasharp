@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30501.0
+VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp", "BSAsharp\BSAsharp.csproj", "{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}"
 EndProject
@@ -11,8 +11,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "License", "License", "{75C1
 	ProjectSection(SolutionItems) = preProject
 		LICENSE.txt = LICENSE.txt
 	EndProjectSection
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp-ui", "BSAsharp-ui\BSAsharp-ui.csproj", "{60634426-B783-4AB6-8991-DF7077576D27}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Signing", "Signing", "{7F46A92D-DCD0-49AA-92BC-CBBEA22DC731}"
 	ProjectSection(SolutionItems) = preProject
@@ -33,10 +31,6 @@ Global
 		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{60634426-B783-4AB6-8991-DF7077576D27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{60634426-B783-4AB6-8991-DF7077576D27}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{60634426-B783-4AB6-8991-DF7077576D27}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{60634426-B783-4AB6-8991-DF7077576D27}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

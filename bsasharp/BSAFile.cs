@@ -28,12 +28,21 @@ namespace BSAsharp
 
         public uint Size { get; private set; }
 
-        private uint _originalSize;
+        private uint? _originalSize;
         public uint OriginalSize
         {
             get
             {
-                return IsCompressed ? _originalSize : Size;
+                if (IsCompressed)
+                {
+                    if (_originalSize == null)
+                        GetData();
+                    Debug.Assert(_originalSize != null);
+
+                    return _originalSize.Value;
+                }
+
+                return Size;
             }
             private set
             {
@@ -80,19 +89,18 @@ namespace BSAsharp
                 _readyData = new byte[0];
 
             uint offset = _settings.BStringPrefixed ? (uint)Filename.Length + 1 : 0;
-            if (IsCompressed)
-            {
-                using (var osReader = createReader(offset, sizeof(uint)))
-                {
-                    OriginalSize = osReader.ReadUInt32();
-                    offset += sizeof(uint);
-                }
-            }
-
             _lazyData = new Lazy<byte[]>(() =>
             {
                 using (var reader = createReader(offset, Size - offset))
+                {
+                    if (IsCompressed)
+                    {
+                        _originalSize = reader.ReadUInt32();
+                        offset += sizeof(uint);
+                    }
+
                     return reader.ReadBytes((int)(Size - offset));
+                }
             });
         }
 

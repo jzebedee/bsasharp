@@ -57,12 +57,12 @@ namespace BSAsharp.Extensions
 
         public static byte[] TrimBuffer(this byte[] buf, int offset, int length = -1)
         {
-            if (offset == 0 && (length < 0 || length == buf.Length))
+            length = length < 0 ? buf.Length - offset : length;
+            if (offset == 0 && length == buf.Length)
                 return buf;
 
-            var newLength = (length < 0 ? buf.Length - offset : length);
-            var newBuf = new byte[newLength];
-            Buffer.BlockCopy(buf, offset, newBuf, 0, newLength);
+            var newBuf = new byte[length];
+            Buffer.BlockCopy(buf, offset, newBuf, 0, length);
 
             return newBuf;
         }

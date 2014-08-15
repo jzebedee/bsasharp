@@ -25,7 +25,7 @@ namespace BSAsharp
             : this(children)
         {
             //Must be all lower case, and use backslash as directory delimiter
-            this.Path = BSAFile.FixPath(path);
+            this.Path = Util.FixPath(path);
             this.Hash = Util.CreateHash(Path, "");
         }
         private BSAFolder(IEnumerable<BSAFile> collection)

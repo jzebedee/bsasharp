@@ -10,6 +10,9 @@ namespace BSAsharp.Extensions
     {
         public static ulong CreateHash(string fname, string ext)
         {
+            if (string.IsNullOrEmpty(fname) && string.IsNullOrEmpty(ext))
+                return 0;
+
             ulong hash1 = (ulong)(fname[fname.Length - 1] | ((fname.Length > 2 ? fname[fname.Length - 2] : 0) << 8) | fname.Length << 16 | fname[0] << 24);
 
             switch (ext)
@@ -39,6 +42,11 @@ namespace BSAsharp.Extensions
             hash2 = ((hash2 << 32) + (hash3 << 32));
 
             return hash2 + hash1;
+        }
+
+        public static string FixPath(string path)
+        {
+            return path.ToLowerInvariant().Replace('/', '\\');
         }
     }
 }

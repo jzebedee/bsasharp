@@ -12,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Diagnostics.Contracts;
 
 namespace BSAsharp
 {
@@ -105,24 +106,29 @@ namespace BSAsharp
 
         public void Pack(string packFolder)
         {
-            var packDirectories = Directory.EnumerateDirectories(packFolder, "*", SearchOption.AllDirectories);
-            var bsaFolders = packDirectories
-                .Select(path =>
-                {
-                    var packFiles = Directory.EnumerateFiles(path);
+            Contract.Assert(Directory.Exists(packFolder), "Folder does not exist");
 
-                    var trimmedPath = path.Replace(packFolder, "").TrimStart(Path.DirectorySeparatorChar);
-                    var bsaFiles = from file in packFiles
-                                   let fileName = Path.GetFileName(file)
-                                   let fnNoExt = Path.GetFileNameWithoutExtension(fileName)
-                                   where !string.IsNullOrEmpty(fnNoExt)
-                                   select new BSAFile(trimmedPath, fileName, Settings, File.ReadAllBytes(file), false);
+            var groupedFiles =
+                from file in Directory.EnumerateFiles(packFolder, "*", SearchOption.AllDirectories)
+                let folderName = Path.GetDirectoryName(file).TrimStart(packFolder)
+                group file by folderName into g
+                select g;
 
-                    return new BSAFolder(trimmedPath, bsaFiles);
-                });
+            foreach (var g in groupedFiles)
+            {
+                var newFolder = new BSAFolder(g.Key);
+                Add(newFolder);
 
-            bsaFolders.ToList()
-                .ForEach(folder => Add(folder));
+                var folder = this.Single(f => f.Path == newFolder.Path);
+
+                var realFiles = from f in g
+                                let ext = Path.GetFileNameWithoutExtension(f)
+                                where !string.IsNullOrEmpty(f)
+                                select f;
+
+                foreach (var file in realFiles)
+                    folder.Add(new BSAFile(g.Key, Path.GetFileName(file), Settings, File.ReadAllBytes(file), false));
+            }
         }
 
         public void Unpack(string outFolder)

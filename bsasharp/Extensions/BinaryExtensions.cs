@@ -36,7 +36,7 @@ namespace BSAsharp.Extensions
 
         public static void WriteBZString(this BinaryWriter writer, string toWrite)
         {
-            WriteBString(writer, toWrite.Last() == '\0' ? toWrite : toWrite + "\0");
+            WriteBString(writer, toWrite.LastOrDefault() == '\0' ? toWrite : toWrite + "\0");
         }
 
         public static string ReadCString(this BinaryReader reader)
@@ -65,6 +65,14 @@ namespace BSAsharp.Extensions
             Buffer.BlockCopy(buf, offset, newBuf, 0, length);
 
             return newBuf;
+        }
+
+        public static string TrimStart(this string str, string toTrim)
+        {
+            if (str.Length >= toTrim.Length && str.IndexOf(toTrim, 0, toTrim.Length) == 0)
+                return str.Substring(Math.Min(str.Length, toTrim.Length + 1));
+
+            return str;
         }
 
         internal static Stream ToStream(this MemoryMappedFile mmf, long offset, long size, MemoryMappedFileAccess rights)

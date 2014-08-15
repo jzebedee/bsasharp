@@ -13,6 +13,7 @@ namespace BSAsharp
     /// <summary>
     /// A managed representation of a BSA file record and its contents. BSAFile is not guaranteed to be valid after the BSAReader that created it is disposed.
     /// </summary>
+    [DebuggerDisplay("{Filename}")]
     public class BSAFile : IHashed, ICloneable
     {
         const uint FLAG_COMPRESS = 1 << 30;
@@ -143,8 +144,8 @@ namespace BSAsharp
         }
         private BSAFile(string path, string name)
         {
-            this.Name = FixName(name);
-            this.Filename = Path.Combine(FixPath(path), this.Name);
+            this.Name = name.ToLowerInvariant();
+            this.Filename = Path.Combine(Util.FixPath(path), this.Name);
 
             _hash = MakeHash();
         }
@@ -152,16 +153,6 @@ namespace BSAsharp
         public override string ToString()
         {
             return Filename;
-        }
-
-        public static string FixName(string name)
-        {
-            return name.ToLowerInvariant();
-        }
-
-        public static string FixPath(string path)
-        {
-            return path.ToLowerInvariant().Replace('/', '\\');
         }
 
         public uint CalculateRecordSize()

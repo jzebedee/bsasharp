@@ -14,18 +14,16 @@ namespace BSAsharp
     /// A managed representation of a BSA file record and its contents. BSAFile is not guaranteed to be valid after the BSAReader that created it is disposed.
     /// </summary>
     [DebuggerDisplay("{Filename}")]
-    public class BSAFile : IHashed, ICloneable
+    public class BSAFile : IBsaEntry, ICloneable
     {
         const uint FLAG_COMPRESS = 1 << 30;
         const int DEFLATE_LEVEL_SIZE = 9, DEFLATE_LEVEL_SPEED = 1, DEFLATE_LEVEL_MIXED = 5;
 
         public string Name { get; private set; }
         public string Filename { get; private set; }
+        public string Path { get; private set; }
 
         public bool IsCompressed { get; private set; }
-
-        private bool _forceCompressionChecked = false;
-        private int? _optDeflateLevel;
 
         public uint Size { get; private set; }
 
@@ -52,13 +50,14 @@ namespace BSAsharp
         }
 
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
-        private readonly ulong _hash;
-        public ulong Hash { get { return _hash; } }
+        public ulong Hash { get; private set; }
 
         private byte[] _readyData;
         private Lazy<byte[]> _lazyData;
 
         private readonly ArchiveSettings _settings;
+        private bool _forceCompressionChecked = false;
+        private int? _optDeflateLevel;
 
         private CompressionOptions Options
         {
@@ -145,9 +144,10 @@ namespace BSAsharp
         private BSAFile(string path, string name)
         {
             this.Name = name.ToLowerInvariant();
-            this.Filename = Path.Combine(Util.FixPath(path), this.Name);
+            this.Path = Util.FixPath(path);
+            this.Filename = System.IO.Path.Combine(Path, Name);
 
-            _hash = MakeHash();
+            Hash = Util.CreateHash(System.IO.Path.GetFileNameWithoutExtension(Name), System.IO.Path.GetExtension(Name));
         }
 
         public override string ToString()
@@ -170,7 +170,7 @@ namespace BSAsharp
 
         private void CheckCompressionSettings()
         {
-            _optDeflateLevel = Options.GetCompressionLevel(Path.GetExtension(Name));
+            _optDeflateLevel = Options.GetCompressionLevel(System.IO.Path.GetExtension(Name));
             if (_optDeflateLevel.HasValue && _optDeflateLevel.Value < 0)
             {
                 //blocks compression changing on this file
@@ -180,11 +180,6 @@ namespace BSAsharp
             {
                 _forceCompressionChecked = false;
             }
-        }
-
-        private ulong MakeHash()
-        {
-            return Util.CreateHash(Path.GetFileNameWithoutExtension(Name), Path.GetExtension(Name));
         }
 
         private bool CheckCompressed(bool compressBitSet)
@@ -368,7 +363,7 @@ namespace BSAsharp
 
         public BSAFile DeepCopy(string newPath = null, string newName = null)
         {
-            return new BSAFile(newPath ?? Path.GetDirectoryName(Filename), newName ?? Name, _settings, _readyData, _lazyData, IsCompressed, OriginalSize, Size);
+            return new BSAFile(newPath ?? Path, newName ?? Name, _settings, _readyData, _lazyData, IsCompressed, OriginalSize, Size);
         }
     }
 }

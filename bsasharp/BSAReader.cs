@@ -33,7 +33,8 @@ namespace BSAsharp
         {
             if (disposing)
             {
-                _mmf.Dispose();
+                if (_mmf != null)
+                    _mmf.Dispose();
             }
         }
         public void Dispose()

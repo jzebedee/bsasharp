@@ -15,7 +15,7 @@ namespace BSAsharp
     /// A managed representation of a BSA folder.
     /// </summary>
     [DebuggerDisplay("{Path} ({Count})")]
-    public class BSAFolder : SortedSet<BSAFile>, IHashed
+    public class BSAFolder : SortedSet<BSAFile>, IBsaEntry
     {
         public string Path { get; private set; }
 

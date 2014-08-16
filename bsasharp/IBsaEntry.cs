@@ -5,8 +5,9 @@ using System.Text;
 
 namespace BSAsharp
 {
-    interface IHashed
+    interface IBsaEntry
     {
         ulong Hash { get; }
+        string Path { get; }
     }
 }

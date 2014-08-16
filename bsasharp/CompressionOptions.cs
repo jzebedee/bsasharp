@@ -18,6 +18,11 @@ namespace BSAsharp
 
         public int SetCompressionLevel(string extension, int level)
         {
+            if (string.IsNullOrEmpty(extension))
+                throw new ArgumentNullException("extension");
+
+            extension = extension.ToUpperInvariant();
+
             int oldLevel;
             if (!ExtensionCompressionLevel.TryGetValue(extension, out oldLevel))
             {
@@ -32,6 +37,11 @@ namespace BSAsharp
         }
         public int? GetCompressionLevel(string extension)
         {
+            if (string.IsNullOrEmpty(extension))
+                throw new ArgumentNullException("extension");
+
+            extension = extension.ToUpperInvariant();
+
             int level;
             if (!ExtensionCompressionLevel.TryGetValue(extension, out level))
                 return null;

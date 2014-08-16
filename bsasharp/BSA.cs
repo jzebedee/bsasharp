@@ -12,11 +12,10 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using System.Diagnostics.Contracts;
 
 namespace BSAsharp
 {
-    public class BSA : SortedSet<BSAFolder>, IDisposable
+    public class BSA : Dictionary<string, BSAFolder>, IDisposable
     {
         internal const int
             FALLOUT_VERSION = 0x68,
@@ -24,13 +23,10 @@ namespace BSAsharp
             BSA_GREET = 0x415342; //'B','S','A','\0'
         internal const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
 
-        private readonly BSAHeader _readHeader;
+        private readonly BSAReader _bsaReader;
 
-        private Dictionary<BSAFolder, uint> _folderRecordOffsetsA;
-        private Dictionary<BSAFolder, uint> _folderRecordOffsetsB;
-
-        private Dictionary<BSAFile, uint> _fileRecordOffsetsA;
-        private Dictionary<BSAFile, uint> _fileRecordOffsetsB;
+        private Dictionary<BSAFolder, uint> _folderRecordOffsetsA, _folderRecordOffsetsB;
+        private Dictionary<BSAFile, uint> _fileRecordOffsetsA, _fileRecordOffsetsB;
 
         public ArchiveSettings Settings { get; private set; }
 
@@ -46,7 +42,7 @@ namespace BSAsharp
         /// Creates a new BSAWrapper instance from an existing folder structure
         /// </summary>
         /// <param name="packFolder">The path of the folder to pack</param>
-        /// <param name="defaultCompressed">The default compression state for the archive</param>
+        /// <param name="settings">The archive settings used during packing</param>
         public BSA(string packFolder, ArchiveSettings settings)
             : this(settings)
         {
@@ -56,7 +52,6 @@ namespace BSAsharp
         /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
         /// </summary>
         public BSA(ArchiveSettings settings)
-            : this(new SortedSet<BSAFolder>())
         {
             this.Settings = settings;
         }
@@ -66,27 +61,18 @@ namespace BSAsharp
         private BSA(MemoryMappedFile BSAMap, CompressionOptions Options)
             : this(new BSAReader(BSAMap, Options))
         {
-            this._bsaMap = BSAMap;
         }
         private BSA(BSAReader BSAReader)
-            : this(BSAReader.Read())
+            : base(BSAReader.Read().ToDictionary(folder => folder.Path, folder => folder))
         {
-            this._readHeader = BSAReader.Header;
             this.Settings = BSAReader.Settings;
 
             this._bsaReader = BSAReader;
-        }
-        private BSA(IEnumerable<BSAFolder> collection)
-            : base(collection, BSAHashComparer.Instance)
-        {
         }
         ~BSA()
         {
             Dispose(false);
         }
-
-        private readonly BSAReader _bsaReader;
-        private readonly MemoryMappedFile _bsaMap;
 
         protected virtual void Dispose(bool disposing)
         {
@@ -94,8 +80,6 @@ namespace BSAsharp
             {
                 if (_bsaReader != null)
                     _bsaReader.Dispose();
-                if (_bsaMap != null)
-                    _bsaMap.Dispose();
             }
         }
         public void Dispose()
@@ -106,7 +90,8 @@ namespace BSAsharp
 
         public void Pack(string packFolder)
         {
-            Contract.Assert(Directory.Exists(packFolder), "Folder does not exist");
+            if (!Directory.Exists(packFolder))
+                throw new DirectoryNotFoundException("Folder \"" + packFolder + "\" does not exist");
 
             var groupedFiles =
                 from file in Directory.EnumerateFiles(packFolder, "*", SearchOption.AllDirectories)
@@ -116,10 +101,12 @@ namespace BSAsharp
 
             foreach (var g in groupedFiles)
             {
-                var newFolder = new BSAFolder(g.Key);
-                Add(newFolder);
-
-                var folder = this.Single(f => f.Path == newFolder.Path);
+                BSAFolder folder;
+                if (!TryGetValue(g.Key, out folder))
+                {
+                    folder = new BSAFolder(g.Key);
+                    Add(folder.Path, folder);
+                }
 
                 var realFiles = from f in g
                                 let ext = Path.GetFileNameWithoutExtension(f)
@@ -133,18 +120,12 @@ namespace BSAsharp
 
         public void Unpack(string outFolder)
         {
-            foreach (var folder in this)
+            foreach (var folder in Values)
                 folder.Unpack(outFolder);
         }
 
         public void Save(string outBsa, bool recreate = false)
         {
-            _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>();
-            _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>();
-
-            _fileRecordOffsetsA = new Dictionary<BSAFile, uint>();
-            _fileRecordOffsetsB = new Dictionary<BSAFile, uint>();
-
             outBsa = Path.GetFullPath(outBsa);
             Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
             File.Delete(outBsa);
@@ -155,10 +136,18 @@ namespace BSAsharp
 
         private void SaveTo(Stream stream, bool recreate)
         {
-            var allFiles = this.SelectMany(fold => fold).ToList();
+            var allFiles = Values.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            BSAHeader header = recreate ? new BSAHeader() : _readHeader;
+            _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>(Count);
+            _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>(Count);
+
+            _fileRecordOffsetsA = new Dictionary<BSAFile, uint>(allFiles.Count);
+            _fileRecordOffsetsB = new Dictionary<BSAFile, uint>(allFiles.Count);
+
+            BSAHeader header = new BSAHeader();
+            if (!recreate && _bsaReader != null)
+                header = _bsaReader.Header;
             if (header.Equals(default(BSAHeader)))
                 //this needs to be set, otherwise we won't write archive information
                 recreate = true;
@@ -174,9 +163,9 @@ namespace BSAsharp
                 if (Settings.BStringPrefixed)
                     header.archiveFlags |= ArchiveFlags.BStringPrefixed;
             }
-            header.folderCount = (uint)this.Count();
+            header.folderCount = (uint)Count;
             header.fileCount = (uint)allFileNames.Count;
-            header.totalFolderNameLength = (uint)this.Sum(bsafolder => bsafolder.Path.Length + 1);
+            header.totalFolderNameLength = (uint)Keys.Sum(path => path.Length + 1);
             header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
             if (recreate)
             {
@@ -187,7 +176,10 @@ namespace BSAsharp
             {
                 header.Write(writer);
 
-                var orderedFolders = this.Select(folder => new { folder, record = CreateFolderRecord(folder) }).ToList();
+                var orderedFolders =
+                    Values.OrderBy(v => v, BSAHashComparer.Instance)
+                    .Select(folder => new { folder, record = CreateFolderRecord(folder) })
+                    .ToList();
                 orderedFolders.ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
 
 #if PARALLEL

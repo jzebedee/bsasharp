@@ -86,7 +86,10 @@ namespace BSAsharp
             : this(path, name, settings, baseRec)
         {
             if (Size == 0 || (Size <= 4 && IsCompressed))
+            {
                 _readyData = new byte[0];
+                OriginalSize = 0;
+            }
 
             uint offset = _settings.BStringPrefixed ? (uint)Filename.Length + 1 : 0;
             _lazyData = new Lazy<byte[]>(() =>

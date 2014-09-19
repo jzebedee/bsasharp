@@ -50,10 +50,5 @@ namespace BSAsharp
         {
             return Path;
         }
-
-        public bool IsParent(BSAFile file)
-        {
-            return Contains(file) && System.IO.Path.Combine(Path, file.Name).Equals(file.Filename);
-        }
     }
 }

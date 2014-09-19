@@ -21,8 +21,6 @@ namespace BSAsharp
             if (string.IsNullOrEmpty(extension))
                 throw new ArgumentNullException("extension");
 
-            extension = extension.ToUpperInvariant();
-
             int oldLevel;
             if (!ExtensionCompressionLevel.TryGetValue(extension, out oldLevel))
             {
@@ -39,8 +37,6 @@ namespace BSAsharp
         {
             if (string.IsNullOrEmpty(extension))
                 throw new ArgumentNullException("extension");
-
-            extension = extension.ToUpperInvariant();
 
             int level;
             if (!ExtensionCompressionLevel.TryGetValue(extension, out level))

@@ -3,19 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using BSAsharp.Format;
 using BSAsharp.Extensions;
-using System.Threading;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Threading.Tasks;
+using BSAsharp.Format;
 
 namespace BSAsharp
 {
-    public class BSA : Dictionary<string, BSAFolder>, IDisposable
+    public class BSA : SortedSet<BSAFolder>, IDisposable
     {
         internal const int
             FALLOUT_VERSION = 0x68,
@@ -52,6 +45,7 @@ namespace BSAsharp
         /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
         /// </summary>
         public BSA(ArchiveSettings settings)
+            : base(BSAHashComparer.Instance)
         {
             this.Settings = settings;
         }
@@ -63,7 +57,7 @@ namespace BSAsharp
         {
         }
         private BSA(BSAReader BSAReader)
-            : base(BSAReader.Read().ToDictionary(folder => folder.Path, folder => folder))
+            : base(BSAReader.Read(), BSAHashComparer.Instance)
         {
             this.Settings = BSAReader.Settings;
 
@@ -101,12 +95,9 @@ namespace BSAsharp
 
             foreach (var g in groupedFiles)
             {
-                BSAFolder folder;
-                if (!TryGetValue(g.Key, out folder))
-                {
-                    folder = new BSAFolder(g.Key);
-                    Add(folder.Path, folder);
-                }
+                BSAFolder folder = this.SingleOrDefault(f => f.Path == g.Key);
+                if (folder == null)
+                    Add((folder = new BSAFolder(g.Key)));
 
                 var realFiles = from f in g
                                 let ext = Path.GetFileNameWithoutExtension(f)
@@ -120,7 +111,7 @@ namespace BSAsharp
 
         public void Unpack(string outFolder)
         {
-            foreach (var folder in Values)
+            foreach (var folder in this)
                 folder.Unpack(outFolder);
         }
 
@@ -136,7 +127,7 @@ namespace BSAsharp
 
         private void SaveTo(Stream stream, bool recreate)
         {
-            var allFiles = Values.SelectMany(fold => fold).ToList();
+            var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
             _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>(Count);
@@ -165,7 +156,7 @@ namespace BSAsharp
             }
             header.folderCount = (uint)Count;
             header.fileCount = (uint)allFileNames.Count;
-            header.totalFolderNameLength = (uint)Keys.Sum(path => path.Length + 1);
+            header.totalFolderNameLength = (uint)this.Sum(folder => folder.Path.Length + 1);
             header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
             if (recreate)
             {
@@ -176,18 +167,16 @@ namespace BSAsharp
             {
                 header.Write(writer);
 
-                var orderedFolders =
-                    Values.OrderBy(v => v, BSAHashComparer.Instance)
-                    .Select(folder => new { folder, record = CreateFolderRecord(folder) })
-                    .ToList();
-                orderedFolders.ForEach(a => WriteFolderRecord(writer, a.folder, a.record));
+                foreach (var folder in this)
+                    WriteFolderRecord(writer, folder, CreateFolderRecord(folder));
 
 #if PARALLEL
                 //parallel pump the files, as checking RecordSize may
                 //trigger a decompress/recompress, depending on settings
                 allFiles.AsParallel().ForAll(file => file.Cache());
 #endif
-                orderedFolders.ForEach(a => WriteFileRecordBlock(writer, a.folder, header.totalFileNameLength));
+                foreach (var folder in this)
+                    WriteFileRecordBlock(writer, folder, header.totalFileNameLength);
 
                 allFileNames.ForEach(fileName => writer.WriteCString(fileName));
 

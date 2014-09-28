@@ -1,12 +1,6 @@
 ﻿using BSAsharp.Extensions;
-using BSAsharp.Format;
-using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.IO;
 
 namespace BSAsharp
@@ -15,20 +9,20 @@ namespace BSAsharp
     /// A managed representation of a BSA folder.
     /// </summary>
     [DebuggerDisplay("{Path} ({Count})")]
-    public class BSAFolder : SortedSet<BSAFile>, IBsaEntry
+    public class BsaFolder : SortedSet<BSAFile>, IBsaEntry
     {
         public string Path { get; private set; }
 
         public ulong Hash { get; private set; }
 
-        public BSAFolder(string path, IEnumerable<BSAFile> children = null)
+        public BsaFolder(string path, IEnumerable<BSAFile> children = null)
             : this(children)
         {
             //Must be all lower case, and use backslash as directory delimiter
-            this.Path = Util.FixPath(path);
-            this.Hash = Util.CreateHash(Path, "");
+            Path = Util.FixPath(path);
+            Hash = Util.CreateHash(Path, "");
         }
-        private BSAFolder(IEnumerable<BSAFile> collection)
+        private BsaFolder(IEnumerable<BSAFile> collection)
             : base(collection ?? new SortedSet<BSAFile>(), BsaHashComparer.Instance)
         {
         }

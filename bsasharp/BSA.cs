@@ -8,7 +8,7 @@ using BSAsharp.Format;
 
 namespace BSAsharp
 {
-    public class BSA : SortedSet<BSAFolder>, IDisposable
+    public class BSA : SortedSet<BsaFolder>, IDisposable
     {
         internal const int
             FALLOUT_VERSION = 0x68,
@@ -18,7 +18,7 @@ namespace BSAsharp
 
         private readonly BSAReader _bsaReader;
 
-        private Dictionary<BSAFolder, uint> _folderRecordOffsetsA, _folderRecordOffsetsB;
+        private Dictionary<BsaFolder, uint> _folderRecordOffsetsA, _folderRecordOffsetsB;
         private Dictionary<BSAFile, uint> _fileRecordOffsetsA, _fileRecordOffsetsB;
 
         public ArchiveSettings Settings { get; private set; }
@@ -95,9 +95,9 @@ namespace BSAsharp
 
             foreach (var g in groupedFiles)
             {
-                BSAFolder folder = this.SingleOrDefault(f => f.Path == g.Key);
+                BsaFolder folder = this.SingleOrDefault(f => f.Path == g.Key);
                 if (folder == null)
-                    Add((folder = new BSAFolder(g.Key)));
+                    Add((folder = new BsaFolder(g.Key)));
 
                 var realFiles = from f in g
                                 let ext = Path.GetFileNameWithoutExtension(f)
@@ -130,8 +130,8 @@ namespace BSAsharp
             var allFiles = this.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            _folderRecordOffsetsA = new Dictionary<BSAFolder, uint>(Count);
-            _folderRecordOffsetsB = new Dictionary<BSAFolder, uint>(Count);
+            _folderRecordOffsetsA = new Dictionary<BsaFolder, uint>(Count);
+            _folderRecordOffsetsB = new Dictionary<BsaFolder, uint>(Count);
 
             _fileRecordOffsetsA = new Dictionary<BSAFile, uint>(allFiles.Count);
             _fileRecordOffsetsB = new Dictionary<BSAFile, uint>(allFiles.Count);
@@ -200,7 +200,7 @@ namespace BSAsharp
             writer.Write(file.GetSaveData());
         }
 
-        private FolderRecord CreateFolderRecord(BSAFolder folder)
+        private FolderRecord CreateFolderRecord(BsaFolder folder)
         {
             return new FolderRecord
             {
@@ -210,7 +210,7 @@ namespace BSAsharp
             };
         }
 
-        private void WriteFolderRecord(BinaryWriter writer, BSAFolder folder, FolderRecord rec)
+        private void WriteFolderRecord(BinaryWriter writer, BsaFolder folder, FolderRecord rec)
         {
             _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
             rec.Write(writer);
@@ -226,7 +226,7 @@ namespace BSAsharp
             };
         }
 
-        private void WriteFileRecordBlock(BinaryWriter writer, BSAFolder folder, uint totalFileNameLength)
+        private void WriteFileRecordBlock(BinaryWriter writer, BsaFolder folder, uint totalFileNameLength)
         {
             _folderRecordOffsetsB.Add(folder, (uint)writer.BaseStream.Position + totalFileNameLength);
             writer.WriteBZString(folder.Path);

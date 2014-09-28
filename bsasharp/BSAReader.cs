@@ -49,7 +49,7 @@ namespace BSAsharp
                 return reader.ReadByte();
         }
 
-        public IEnumerable<BSAFolder> Read()
+        public IEnumerable<BsaFolder> Read()
         {
             using (var reader = _mmf.ToReader(0, BSAHeader.Size))
                 Header = new BSAHeader(reader);
@@ -67,7 +67,7 @@ namespace BSAsharp
             return BuildBSALayout(folderDict, fileNames);
         }
 
-        protected IEnumerable<BSAFolder> BuildBSALayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
+        protected IEnumerable<BsaFolder> BuildBSALayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
         {
             var pathedFiles = folderDict
                 .SelectMany(kvp =>
@@ -85,7 +85,7 @@ namespace BSAsharp
                             Settings,
                             a.record,
                             (off, len) => _mmf.ToReader(a.record.offset + off, len)))
-                select new BSAFolder(g.Key, bsaFiles);
+                select new BsaFolder(g.Key, bsaFiles);
         }
 
         protected Dictionary<string, IList<FileRecord>> ReadFolders(ref long offset, uint folderCount)

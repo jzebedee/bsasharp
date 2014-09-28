@@ -29,7 +29,7 @@ namespace BSAsharp
             this.Hash = Util.CreateHash(Path, "");
         }
         private BSAFolder(IEnumerable<BSAFile> collection)
-            : base(collection ?? new SortedSet<BSAFile>(), BSAHashComparer.Instance)
+            : base(collection ?? new SortedSet<BSAFile>(), BsaHashComparer.Instance)
         {
         }
 

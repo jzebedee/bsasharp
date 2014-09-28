@@ -45,7 +45,7 @@ namespace BSAsharp
         /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
         /// </summary>
         public BSA(ArchiveSettings settings)
-            : base(BSAHashComparer.Instance)
+            : base(BsaHashComparer.Instance)
         {
             this.Settings = settings;
         }
@@ -57,7 +57,7 @@ namespace BSAsharp
         {
         }
         private BSA(BSAReader BSAReader)
-            : base(BSAReader.Read(), BSAHashComparer.Instance)
+            : base(BSAReader.Read(), BsaHashComparer.Instance)
         {
             this.Settings = BSAReader.Settings;
 

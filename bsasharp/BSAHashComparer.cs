@@ -1,17 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace BSAsharp
 {
-    sealed class BSAHashComparer : IComparer<IBsaEntry>
+    sealed class BsaHashComparer : IComparer<IBsaEntry>
     {
         //Comparisons are based ONLY on the hash, which is created only
         //from the filename in BSAFiles and the path in BSAFolders.
         //Don't try to use comparisons OUTSIDE of the folder!!
-        public static readonly BSAHashComparer Instance = new BSAHashComparer();
-        private BSAHashComparer()
+        public static readonly BsaHashComparer Instance = new BsaHashComparer();
+        private BsaHashComparer()
         {
             
         }

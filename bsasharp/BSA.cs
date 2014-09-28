@@ -16,7 +16,7 @@ namespace BSAsharp
             BsaGreet = 0x415342; //'B','S','A','\0'
         internal const uint BsaMaxSize = 0x80000000; //2 GiB
 
-        private readonly BSAReader _bsaReader;
+        private readonly BsaReader _bsaReader;
 
         private Dictionary<BsaFolder, uint> _folderRecordOffsetsA, _folderRecordOffsetsB;
         private Dictionary<BsaFile, uint> _fileRecordOffsetsA, _fileRecordOffsetsB;
@@ -54,10 +54,10 @@ namespace BSAsharp
         //wtf C#
         //please get real ctor overloads someday
         private Bsa(MemoryMappedFile bsaMap, CompressionOptions options)
-            : this(new BSAReader(bsaMap, options))
+            : this(new BsaReader(bsaMap, options))
         {
         }
-        private Bsa(BSAReader bsaReader)
+        private Bsa(BsaReader bsaReader)
             : base(bsaReader.Read(), BsaHashComparer.Instance)
         {
             Settings = bsaReader.Settings;

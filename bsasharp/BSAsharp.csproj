@@ -68,7 +68,7 @@
     <Compile Include="Format\FileRecord.cs" />
     <Compile Include="Format\FolderRecord.cs" />
     <Compile Include="IBsaEntry.cs" />
-    <Compile Include="BSAReader.cs" />
+    <Compile Include="BsaReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Zlib.cs" />
   </ItemGroup>

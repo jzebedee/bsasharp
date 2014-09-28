@@ -1,17 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
-using System.Text;
-using System.Runtime.InteropServices;
-using System.Diagnostics;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
 
 namespace BSAsharp
 {
-    internal class BSAReader : IDisposable
+    internal class BsaReader : IDisposable
     {
         public BSAHeader Header { get; protected set; }
 
@@ -19,12 +15,12 @@ namespace BSAsharp
 
         private readonly MemoryMappedFile _mmf;
 
-        public BSAReader(MemoryMappedFile mmf, CompressionOptions options)
+        public BsaReader(MemoryMappedFile mmf, CompressionOptions options)
         {
-            this._mmf = mmf;
-            this.Settings = new ArchiveSettings() { Options = options };
+            _mmf = mmf;
+            Settings = new ArchiveSettings { Options = options };
         }
-        ~BSAReader()
+        ~BsaReader()
         {
             Dispose(false);
         }
@@ -64,10 +60,10 @@ namespace BSAsharp
             var folderDict = ReadFolders(ref offset, Header.folderCount);
             var fileNames = ReadFileNameBlocks(offset, Header.fileCount);
 
-            return BuildBSALayout(folderDict, fileNames);
+            return BuildBsaLayout(folderDict, fileNames);
         }
 
-        protected IEnumerable<BsaFolder> BuildBSALayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
+        protected IEnumerable<BsaFolder> BuildBsaLayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
         {
             var pathedFiles = folderDict
                 .SelectMany(kvp =>

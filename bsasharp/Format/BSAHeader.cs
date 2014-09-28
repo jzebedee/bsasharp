@@ -2,43 +2,43 @@
 
 namespace BSAsharp.Format
 {
-    internal struct BSAHeader
+    internal struct BsaHeader
     {
         internal const int Size = 0x24;
 
-        internal BSAHeader(BinaryReader reader)
+        internal BsaHeader(BinaryReader reader)
         {
-            field = reader.ReadUInt32();
-            version = reader.ReadUInt32();
-            offset = reader.ReadUInt32();
-            archiveFlags = (ArchiveFlags)reader.ReadUInt32();
-            folderCount = reader.ReadUInt32();
-            fileCount = reader.ReadUInt32();
-            totalFolderNameLength = reader.ReadUInt32();
-            totalFileNameLength = reader.ReadUInt32();
-            fileFlags = (FileFlags)reader.ReadUInt32();
+            Field = reader.ReadUInt32();
+            Version = reader.ReadUInt32();
+            Offset = reader.ReadUInt32();
+            ArchiveFlags = (ArchiveFlags)reader.ReadUInt32();
+            FolderCount = reader.ReadUInt32();
+            FileCount = reader.ReadUInt32();
+            TotalFolderNameLength = reader.ReadUInt32();
+            TotalFileNameLength = reader.ReadUInt32();
+            FileFlags = (FileFlags)reader.ReadUInt32();
         }
         internal void Write(BinaryWriter writer)
         {
-            writer.Write(field);
-            writer.Write(version);
-            writer.Write(offset);
-            writer.Write((uint)archiveFlags);
-            writer.Write(folderCount);
-            writer.Write(fileCount);
-            writer.Write(totalFolderNameLength);
-            writer.Write(totalFileNameLength);
-            writer.Write((uint)fileFlags);
+            writer.Write(Field);
+            writer.Write(Version);
+            writer.Write(Offset);
+            writer.Write((uint)ArchiveFlags);
+            writer.Write(FolderCount);
+            writer.Write(FileCount);
+            writer.Write(TotalFolderNameLength);
+            writer.Write(TotalFileNameLength);
+            writer.Write((uint)FileFlags);
         }
 
-        public uint field;
-        public uint version;
-        public uint offset;
-        public ArchiveFlags archiveFlags;
-        public uint folderCount;
-        public uint fileCount;
-        public uint totalFolderNameLength;
-        public uint totalFileNameLength;
-        public FileFlags fileFlags;
+        public uint Field;
+        public uint Version;
+        public uint Offset;
+        public ArchiveFlags ArchiveFlags;
+        public uint FolderCount;
+        public uint FileCount;
+        public uint TotalFolderNameLength;
+        public uint TotalFileNameLength;
+        public FileFlags FileFlags;
     }
 }

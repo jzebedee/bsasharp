@@ -63,7 +63,7 @@
     <Compile Include="Extensions\BinaryExtensions.cs" />
     <Compile Include="Extensions\Util.cs" />
     <Compile Include="Format\ArchiveFlags.cs" />
-    <Compile Include="Format\BSAHeader.cs" />
+    <Compile Include="Format\BsaHeader.cs" />
     <Compile Include="Format\FileFlags.cs" />
     <Compile Include="Format\FileRecord.cs" />
     <Compile Include="Format\FolderRecord.cs" />

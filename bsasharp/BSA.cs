@@ -140,31 +140,31 @@ namespace BSAsharp
             _fileRecordOffsetsA = new Dictionary<BsaFile, uint>(allFiles.Count);
             _fileRecordOffsetsB = new Dictionary<BsaFile, uint>(allFiles.Count);
 
-            var header = new BSAHeader();
+            var header = new BsaHeader();
             if (!recreate && _bsaReader != null)
                 header = _bsaReader.Header;
-            if (header.Equals(default(BSAHeader)))
+            if (header.Equals(default(BsaHeader)))
                 //this needs to be set, otherwise we won't write archive information
                 recreate = true;
 
-            header.field = BsaGreet;
-            header.version = FalloutVersion;
-            header.offset = BSAHeader.Size;
+            header.Field = BsaGreet;
+            header.Version = FalloutVersion;
+            header.Offset = BsaHeader.Size;
             if (recreate)
             {
-                header.archiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
+                header.ArchiveFlags = ArchiveFlags.NamedDirectories | ArchiveFlags.NamedFiles;
                 if (Settings.DefaultCompressed)
-                    header.archiveFlags |= ArchiveFlags.Compressed;
+                    header.ArchiveFlags |= ArchiveFlags.Compressed;
                 if (Settings.BStringPrefixed)
-                    header.archiveFlags |= ArchiveFlags.BStringPrefixed;
+                    header.ArchiveFlags |= ArchiveFlags.BStringPrefixed;
             }
-            header.folderCount = (uint)Count;
-            header.fileCount = (uint)allFileNames.Count;
-            header.totalFolderNameLength = (uint)this.Sum(folder => folder.Path.Length + 1);
-            header.totalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
+            header.FolderCount = (uint)Count;
+            header.FileCount = (uint)allFileNames.Count;
+            header.TotalFolderNameLength = (uint)this.Sum(folder => folder.Path.Length + 1);
+            header.TotalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
             if (recreate)
             {
-                header.fileFlags = CreateFileFlags(allFileNames);
+                header.FileFlags = CreateFileFlags(allFileNames);
             }
 
             using (var writer = new BinaryWriter(stream))
@@ -180,7 +180,7 @@ namespace BSAsharp
                 allFiles.AsParallel().ForAll(file => file.Cache());
 #endif
                 foreach (var folder in this)
-                    WriteFileRecordBlock(writer, folder, header.totalFileNameLength);
+                    WriteFileRecordBlock(writer, folder, header.TotalFileNameLength);
 
                 allFileNames.ForEach(writer.WriteCString);
 

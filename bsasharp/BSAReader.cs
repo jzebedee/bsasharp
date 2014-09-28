@@ -9,7 +9,7 @@ namespace BSAsharp
 {
     internal class BsaReader : IDisposable
     {
-        public BSAHeader Header { get; protected set; }
+        public BsaHeader Header { get; protected set; }
 
         public ArchiveSettings Settings { get; private set; }
 
@@ -47,18 +47,18 @@ namespace BSAsharp
 
         public IEnumerable<BsaFolder> Read()
         {
-            using (var reader = _mmf.ToReader(0, BSAHeader.Size))
-                Header = new BSAHeader(reader);
+            using (var reader = _mmf.ToReader(0, BsaHeader.Size))
+                Header = new BsaHeader(reader);
 
-            if (Header.version != Bsa.FalloutVersion)
+            if (Header.Version != Bsa.FalloutVersion)
                 throw new NotImplementedException("Unsupported BSA version");
 
-            Settings.BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-            Settings.DefaultCompressed = Header.archiveFlags.HasFlag(ArchiveFlags.Compressed);
+            Settings.BStringPrefixed = Header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            Settings.DefaultCompressed = Header.ArchiveFlags.HasFlag(ArchiveFlags.Compressed);
 
-            long offset = BSAHeader.Size;
-            var folderDict = ReadFolders(ref offset, Header.folderCount);
-            var fileNames = ReadFileNameBlocks(offset, Header.fileCount);
+            long offset = BsaHeader.Size;
+            var folderDict = ReadFolders(ref offset, Header.FolderCount);
+            var fileNames = ReadFileNameBlocks(offset, Header.FileCount);
 
             return BuildBsaLayout(folderDict, fileNames);
         }
@@ -95,7 +95,7 @@ namespace BSAsharp
                     folders.Add(new FolderRecord(reader));
                 foreach (var folder in folders)
                 {
-                    offset = folder.offset - Header.totalFileNameLength;
+                    offset = folder.offset - Header.TotalFileNameLength;
 
                     string folderName;
                     var fileRecords = ReadFileRecordBlocks(ref offset, folder.count, out folderName);
@@ -130,7 +130,7 @@ namespace BSAsharp
         {
             var fileNames = new List<string>((int)count);
 
-            using (var reader = _mmf.ToReader(offset, Header.totalFileNameLength))
+            using (var reader = _mmf.ToReader(offset, Header.TotalFileNameLength))
                 for (int i = 0; i < count; i++)
                     fileNames.Add(reader.ReadCString());
 

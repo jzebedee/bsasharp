@@ -1,13 +1,15 @@
-﻿namespace BSAsharp.Extensions
+﻿using System.Diagnostics;
+
+namespace BSAsharp.Extensions
 {
     public static class Util
     {
-        public static ulong CreateHash(string fname, string ext)
+        public static ulong CreateHash(string fname = "", string ext = "")
         {
-            if (string.IsNullOrEmpty(fname) && string.IsNullOrEmpty(ext))
-                return 0;
+            Debug.Assert(fname != null, "fname != null");
+            Debug.Assert(ext != null, "ext != null");
 
-            ulong hash1 = (ulong)(fname[fname.Length - 1] | ((fname.Length > 2 ? fname[fname.Length - 2] : 0) << 8) | fname.Length << 16 | fname[0] << 24);
+            var hash1 = (ulong)(fname[fname.Length - 1] | ((fname.Length > 2 ? fname[fname.Length - 2] : 0) << 8) | fname.Length << 16 | fname[0] << 24);
 
             switch (ext)
             {

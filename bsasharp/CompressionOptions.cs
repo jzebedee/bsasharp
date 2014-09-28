@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace BSAsharp
 {
@@ -10,9 +8,9 @@ namespace BSAsharp
         public CompressionStrategy Strategy { get; set; }
         public Dictionary<string, int> ExtensionCompressionLevel { get; set; }
 
-        public CompressionOptions(CompressionStrategy Strategy = CompressionStrategy.Safe)
+        public CompressionOptions(CompressionStrategy strategy = CompressionStrategy.Safe)
         {
-            this.Strategy = Strategy;
+            Strategy = strategy;
             ExtensionCompressionLevel = new Dictionary<string, int>();
         }
 
@@ -33,15 +31,17 @@ namespace BSAsharp
 
             return oldLevel;
         }
+
         public int? GetCompressionLevel(string extension)
         {
             if (string.IsNullOrEmpty(extension))
                 throw new ArgumentNullException("extension");
 
             int level;
-            if (!ExtensionCompressionLevel.TryGetValue(extension, out level))
-                return null;
-            return level;
+            if (ExtensionCompressionLevel.TryGetValue(extension, out level))
+                return level;
+
+            return null;
         }
     }
 }

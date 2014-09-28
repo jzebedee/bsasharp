@@ -54,7 +54,7 @@ namespace BSAsharp
             using (var reader = _mmf.ToReader(0, BSAHeader.Size))
                 Header = new BSAHeader(reader);
 
-            if (Header.version != BSA.FALLOUT_VERSION)
+            if (Header.version != Bsa.FalloutVersion)
                 throw new NotImplementedException("Unsupported BSA version");
 
             Settings.BStringPrefixed = Header.archiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);

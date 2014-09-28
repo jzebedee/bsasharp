@@ -56,16 +56,16 @@ namespace BSAsharp_cli
             for (int i = 0; i < tests; i++)
             {
 #endif
-                IEnumerable<BSA> BSAs = null;
+                IEnumerable<Bsa> BSAs = null;
                 if (inPath != null)
                 {
                     if (File.Exists(inPath))
-                        BSAs = new[] { new BSA(inPath, new CompressionOptions(CompressionStrategy.Size | CompressionStrategy.Unsafe)) };
+                        BSAs = new[] { new Bsa(inPath, new CompressionOptions(CompressionStrategy.Size | CompressionStrategy.Unsafe)) };
                     else if (Directory.Exists(inPath))
-                        BSAs = Directory.EnumerateFiles(inPath, "*.bsa", SearchOption.TopDirectoryOnly).Select(bsapath => new BSA(bsapath));
+                        BSAs = Directory.EnumerateFiles(inPath, "*.bsa", SearchOption.TopDirectoryOnly).Select(bsapath => new Bsa(bsapath));
                 }
                 else if (packFolder != null)
-                    BSAs = new[] { new BSA(packFolder, new ArchiveSettings(true, false, new CompressionOptions(CompressionStrategy.Size))) };
+                    BSAs = new[] { new Bsa(packFolder, new ArchiveSettings(true, false, new CompressionOptions(CompressionStrategy.Size))) };
                 Trace.Assert(BSAs != null);
 
                 foreach (var wrapper in BSAs)

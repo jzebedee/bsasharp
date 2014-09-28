@@ -8,13 +8,13 @@ using BSAsharp.Format;
 
 namespace BSAsharp
 {
-    public class BSA : SortedSet<BsaFolder>, IDisposable
+    public class Bsa : SortedSet<BsaFolder>, IDisposable
     {
         internal const int
-            FALLOUT_VERSION = 0x68,
-            SIZE_RECORD_OFFSET = 0xC, //SIZE_RECORD - sizeof(uint)
-            BSA_GREET = 0x415342; //'B','S','A','\0'
-        internal const uint BSA_MAX_SIZE = 0x80000000; //2 GiB
+            FalloutVersion = 0x68,
+            SizeRecordOffset = 0xC, //SIZE_RECORD - sizeof(uint)
+            BsaGreet = 0x415342; //'B','S','A','\0'
+        internal const uint BsaMaxSize = 0x80000000; //2 GiB
 
         private readonly BSAReader _bsaReader;
 
@@ -27,8 +27,9 @@ namespace BSAsharp
         /// Creates a new BSAWrapper instance around an existing BSA file
         /// </summary>
         /// <param name="bsaPath">The path of the file to open</param>
-        public BSA(string bsaPath, CompressionOptions Options = null)
-            : this(MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, null, 0L, MemoryMappedFileAccess.Read), Options ?? new CompressionOptions())
+        /// <param name="options"></param>
+        public Bsa(string bsaPath, CompressionOptions options = null)
+            : this(MemoryMappedFile.CreateFromFile(bsaPath, FileMode.Open, null, 0L, MemoryMappedFileAccess.Read), options ?? new CompressionOptions())
         {
         }
         /// <summary>
@@ -36,7 +37,7 @@ namespace BSAsharp
         /// </summary>
         /// <param name="packFolder">The path of the folder to pack</param>
         /// <param name="settings">The archive settings used during packing</param>
-        public BSA(string packFolder, ArchiveSettings settings)
+        public Bsa(string packFolder, ArchiveSettings settings)
             : this(settings)
         {
             Pack(packFolder);
@@ -44,26 +45,26 @@ namespace BSAsharp
         /// <summary>
         /// Creates an empty BSAWrapper instance that can be modified and saved to a BSA file
         /// </summary>
-        public BSA(ArchiveSettings settings)
+        public Bsa(ArchiveSettings settings)
             : base(BsaHashComparer.Instance)
         {
-            this.Settings = settings;
+            Settings = settings;
         }
 
         //wtf C#
         //please get real ctor overloads someday
-        private BSA(MemoryMappedFile BSAMap, CompressionOptions Options)
-            : this(new BSAReader(BSAMap, Options))
+        private Bsa(MemoryMappedFile bsaMap, CompressionOptions options)
+            : this(new BSAReader(bsaMap, options))
         {
         }
-        private BSA(BSAReader BSAReader)
-            : base(BSAReader.Read(), BsaHashComparer.Instance)
+        private Bsa(BSAReader bsaReader)
+            : base(bsaReader.Read(), BsaHashComparer.Instance)
         {
-            this.Settings = BSAReader.Settings;
+            Settings = bsaReader.Settings;
 
-            this._bsaReader = BSAReader;
+            _bsaReader = bsaReader;
         }
-        ~BSA()
+        ~Bsa()
         {
             Dispose(false);
         }
@@ -118,7 +119,10 @@ namespace BSAsharp
         public void Save(string outBsa, bool recreate = false)
         {
             outBsa = Path.GetFullPath(outBsa);
-            Directory.CreateDirectory(Path.GetDirectoryName(outBsa));
+
+            var outBsaDir = Path.GetDirectoryName(outBsa);
+            if(!string.IsNullOrEmpty(outBsaDir))
+                Directory.CreateDirectory(outBsaDir);
             File.Delete(outBsa);
 
             using (var stream = File.OpenWrite(outBsa))
@@ -143,8 +147,8 @@ namespace BSAsharp
                 //this needs to be set, otherwise we won't write archive information
                 recreate = true;
 
-            header.field = BSA_GREET;
-            header.version = FALLOUT_VERSION;
+            header.field = BsaGreet;
+            header.version = FalloutVersion;
             header.offset = BSAHeader.Size;
             if (recreate)
             {
@@ -212,7 +216,7 @@ namespace BSAsharp
 
         private void WriteFolderRecord(BinaryWriter writer, BsaFolder folder, FolderRecord rec)
         {
-            _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
+            _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SizeRecordOffset);
             rec.Write(writer);
         }
 
@@ -235,7 +239,7 @@ namespace BSAsharp
             {
                 var record = CreateFileRecord(file);
 
-                _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SIZE_RECORD_OFFSET);
+                _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SizeRecordOffset);
                 record.Write(writer);
             }
         }

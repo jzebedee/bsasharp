@@ -59,7 +59,7 @@
     <Compile Include="CompressionOptions.cs" />
     <Compile Include="CompressionStrategy.cs" />
     <Compile Include="BsaHashComparer.cs" />
-    <Compile Include="BSA.cs" />
+    <Compile Include="Bsa.cs" />
     <Compile Include="Extensions\BinaryExtensions.cs" />
     <Compile Include="Extensions\Util.cs" />
     <Compile Include="Format\ArchiveFlags.cs" />

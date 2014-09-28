@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-
-namespace BSAsharp.Extensions
+﻿namespace BSAsharp.Extensions
 {
     public static class Util
     {

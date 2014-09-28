@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace BSAsharp
+﻿namespace BSAsharp
 {
     public sealed class ArchiveSettings
     {
@@ -11,11 +6,11 @@ namespace BSAsharp
         public bool BStringPrefixed { get; internal set; }
         public CompressionOptions Options { get; internal set; }
 
-        public ArchiveSettings(bool DefaultCompressed, bool BStringPrefixed, CompressionOptions Options)
+        public ArchiveSettings(bool defaultCompressed, bool bStringPrefixed, CompressionOptions options)
         {
-            this.DefaultCompressed = DefaultCompressed;
-            this.BStringPrefixed = BStringPrefixed;
-            this.Options = Options;
+            DefaultCompressed = defaultCompressed;
+            BStringPrefixed = bStringPrefixed;
+            Options = options;
         }
         internal ArchiveSettings()
         {

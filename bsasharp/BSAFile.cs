@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
 
@@ -14,10 +10,10 @@ namespace BSAsharp
     /// A managed representation of a BSA file record and its contents. BSAFile is not guaranteed to be valid after the BSAReader that created it is disposed.
     /// </summary>
     [DebuggerDisplay("{Filename}")]
-    public class BSAFile : IBsaEntry, ICloneable
+    public class BsaFile : IBsaEntry, ICloneable
     {
-        const uint FLAG_COMPRESS = 1 << 30;
-        const int DEFLATE_LEVEL_SIZE = 9, DEFLATE_LEVEL_SPEED = 1, DEFLATE_LEVEL_MIXED = 5;
+        const uint FlagCompress = 1 << 30;
+        const int DeflateLevelSize = 9, DeflateLevelSpeed = 1, DeflateLevelMixed = 5;
 
         public string Name { get; private set; }
         public string Filename { get; private set; }
@@ -56,7 +52,7 @@ namespace BSAsharp
         private Lazy<byte[]> _lazyData;
 
         private readonly ArchiveSettings _settings;
-        private bool _forceCompressionChecked = false;
+        private bool _forceCompressionChecked;
         private int? _optDeflateLevel;
 
         private CompressionOptions Options
@@ -75,14 +71,14 @@ namespace BSAsharp
             }
         }
 
-        public BSAFile(string path, string name, ArchiveSettings settings, byte[] data, bool inputCompressed)
+        public BsaFile(string path, string name, ArchiveSettings settings, byte[] data, bool inputCompressed)
             : this(path, name, settings)
         {
             //inputCompressed param specifies compression of data param, NOT final result!
             UpdateData(data, inputCompressed);
         }
 
-        internal BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<uint, uint, BinaryReader> createReader)
+        internal BsaFile(string path, string name, ArchiveSettings settings, FileRecord baseRec, Func<uint, uint, BinaryReader> createReader)
             : this(path, name, settings, baseRec)
         {
             if (Size == 0 || (Size <= 4 && IsCompressed))
@@ -107,20 +103,20 @@ namespace BSAsharp
             });
         }
 
-        private BSAFile(string path, string name, ArchiveSettings settings, FileRecord baseRec)
+        private BsaFile(string path, string name, ArchiveSettings settings, FileRecord baseRec)
             : this(path, name, settings)
         {
-            bool compressBitSet = (baseRec.size & FLAG_COMPRESS) != 0;
+            bool compressBitSet = (baseRec.size & FlagCompress) != 0;
             if (compressBitSet)
-                baseRec.size ^= FLAG_COMPRESS;
+                baseRec.size ^= FlagCompress;
 
-            this.IsCompressed = CheckCompressed(compressBitSet);
-            this.Size = baseRec.size;
+            IsCompressed = CheckCompressed(compressBitSet);
+            Size = baseRec.size;
         }
-        private BSAFile(string path, string name, ArchiveSettings settings)
+        private BsaFile(string path, string name, ArchiveSettings settings)
             : this(path, name)
         {
-            this._settings = settings;
+            _settings = settings;
 
             CheckCompressionSettings();
 
@@ -129,26 +125,26 @@ namespace BSAsharp
         }
 
         //Clone ctor
-        private BSAFile(string path, string name, ArchiveSettings settings, byte[] readyData, Lazy<byte[]> lazyData, bool isCompressed, uint originalSize, uint size)
+        private BsaFile(string path, string name, ArchiveSettings settings, byte[] readyData, Lazy<byte[]> lazyData, bool isCompressed, uint originalSize, uint size)
             : this(path, name)
         {
-            this._settings = settings;
+            _settings = settings;
 
-            this._readyData = readyData;
-            this._lazyData = lazyData;
+            _readyData = readyData;
+            _lazyData = lazyData;
 
-            this.IsCompressed = isCompressed;
+            IsCompressed = isCompressed;
 
-            this.OriginalSize = originalSize;
-            this.Size = size;
+            OriginalSize = originalSize;
+            Size = size;
 
             CheckCompressionSettings();
         }
-        private BSAFile(string path, string name)
+        private BsaFile(string path, string name)
         {
-            this.Name = name.ToLowerInvariant();
-            this.Path = Util.FixPath(path);
-            this.Filename = System.IO.Path.Combine(Path, Name);
+            Name = name.ToLowerInvariant();
+            Path = Util.FixPath(path);
+            Filename = System.IO.Path.Combine(Path, Name);
 
             Hash = Util.CreateHash(System.IO.Path.GetFileNameWithoutExtension(Name), System.IO.Path.GetExtension(Name));
         }
@@ -162,11 +158,11 @@ namespace BSAsharp
         {
             ForceCompressionIfNeeded();
 
-            uint baseSize = this.Size;
+            uint baseSize = Size;
 
             bool setCompressBit = CheckCompressed(IsCompressed);
             if (setCompressBit)
-                baseSize |= FLAG_COMPRESS;
+                baseSize |= FlagCompress;
 
             return baseSize;
         }
@@ -198,7 +194,7 @@ namespace BSAsharp
             IsCompressed = CheckCompressed(flipCompression);
             _readyData = buf;
 
-            if (this.IsCompressed)
+            if (IsCompressed)
             {
                 if (!inputCompressed)
                     OriginalSize = (uint)buf.Length;
@@ -265,10 +261,8 @@ namespace BSAsharp
             {
                 return GetInflatedData(force);
             }
-            else
-            {
-                return GetDeflatedData(force);
-            }
+
+            return GetDeflatedData(force);
         }
 
         public Stream GetContentStream(bool extract, bool force = false)
@@ -350,23 +344,23 @@ namespace BSAsharp
                 return _optDeflateLevel.Value;
 
             if (Strategy.HasFlag(CompressionStrategy.Size | CompressionStrategy.Speed))
-                return DEFLATE_LEVEL_MIXED;
+                return DeflateLevelMixed;
             if (Strategy.HasFlag(CompressionStrategy.Speed))
-                return DEFLATE_LEVEL_SPEED;
+                return DeflateLevelSpeed;
             if (Strategy.HasFlag(CompressionStrategy.Size))
-                return DEFLATE_LEVEL_SIZE;
+                return DeflateLevelSize;
 
             throw new ArgumentException("CompressionStrategy did not have enough information");
         }
 
         public object Clone()
         {
-            return new BSAFile(Filename, Name, _settings, _readyData, _lazyData, IsCompressed, OriginalSize, Size);
+            return new BsaFile(Filename, Name, _settings, _readyData, _lazyData, IsCompressed, OriginalSize, Size);
         }
 
-        public BSAFile DeepCopy(string newPath = null, string newName = null)
+        public BsaFile DeepCopy(string newPath = null, string newName = null)
         {
-            return new BSAFile(newPath ?? Path, newName ?? Name, _settings, _readyData, _lazyData, IsCompressed, OriginalSize, Size);
+            return new BsaFile(newPath ?? Path, newName ?? Name, _settings, _readyData, _lazyData, IsCompressed, OriginalSize, Size);
         }
     }
 }

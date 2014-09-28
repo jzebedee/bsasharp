@@ -9,21 +9,21 @@ namespace BSAsharp
     /// A managed representation of a BSA folder.
     /// </summary>
     [DebuggerDisplay("{Path} ({Count})")]
-    public class BsaFolder : SortedSet<BSAFile>, IBsaEntry
+    public class BsaFolder : SortedSet<BsaFile>, IBsaEntry
     {
         public string Path { get; private set; }
 
         public ulong Hash { get; private set; }
 
-        public BsaFolder(string path, IEnumerable<BSAFile> children = null)
+        public BsaFolder(string path, IEnumerable<BsaFile> children = null)
             : this(children)
         {
             //Must be all lower case, and use backslash as directory delimiter
             Path = Util.FixPath(path);
             Hash = Util.CreateHash(Path, "");
         }
-        private BsaFolder(IEnumerable<BSAFile> collection)
-            : base(collection ?? new SortedSet<BSAFile>(), BsaHashComparer.Instance)
+        private BsaFolder(IEnumerable<BsaFile> collection)
+            : base(collection ?? new SortedSet<BsaFile>(), BsaHashComparer.Instance)
         {
         }
 

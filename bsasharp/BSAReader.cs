@@ -79,7 +79,7 @@ namespace BSAsharp
                 from g in fileLookup
                 let bsaFiles =
                     g.Select(a =>
-                        new BSAFile(
+                        new BsaFile(
                             g.Key,
                             a.fn,
                             Settings,

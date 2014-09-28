@@ -19,7 +19,7 @@ namespace BSAsharp
         private readonly BSAReader _bsaReader;
 
         private Dictionary<BsaFolder, uint> _folderRecordOffsetsA, _folderRecordOffsetsB;
-        private Dictionary<BSAFile, uint> _fileRecordOffsetsA, _fileRecordOffsetsB;
+        private Dictionary<BsaFile, uint> _fileRecordOffsetsA, _fileRecordOffsetsB;
 
         public ArchiveSettings Settings { get; private set; }
 
@@ -105,7 +105,7 @@ namespace BSAsharp
                                 select f;
 
                 foreach (var file in realFiles)
-                    folder.Add(new BSAFile(g.Key, Path.GetFileName(file), Settings, File.ReadAllBytes(file), false));
+                    folder.Add(new BsaFile(g.Key, Path.GetFileName(file), Settings, File.ReadAllBytes(file), false));
             }
         }
 
@@ -133,8 +133,8 @@ namespace BSAsharp
             _folderRecordOffsetsA = new Dictionary<BsaFolder, uint>(Count);
             _folderRecordOffsetsB = new Dictionary<BsaFolder, uint>(Count);
 
-            _fileRecordOffsetsA = new Dictionary<BSAFile, uint>(allFiles.Count);
-            _fileRecordOffsetsB = new Dictionary<BSAFile, uint>(allFiles.Count);
+            _fileRecordOffsetsA = new Dictionary<BsaFile, uint>(allFiles.Count);
+            _fileRecordOffsetsB = new Dictionary<BsaFile, uint>(allFiles.Count);
 
             BSAHeader header = new BSAHeader();
             if (!recreate && _bsaReader != null)
@@ -194,7 +194,7 @@ namespace BSAsharp
             }
         }
 
-        private void WriteFileBlock(BinaryWriter writer, BSAFile file)
+        private void WriteFileBlock(BinaryWriter writer, BsaFile file)
         {
             _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
             writer.Write(file.GetSaveData());
@@ -216,7 +216,7 @@ namespace BSAsharp
             rec.Write(writer);
         }
 
-        private FileRecord CreateFileRecord(BSAFile file)
+        private FileRecord CreateFileRecord(BsaFile file)
         {
             return new FileRecord
             {

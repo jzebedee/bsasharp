@@ -140,7 +140,7 @@ namespace BSAsharp
             _fileRecordOffsetsA = new Dictionary<BsaFile, uint>(allFiles.Count);
             _fileRecordOffsetsB = new Dictionary<BsaFile, uint>(allFiles.Count);
 
-            BSAHeader header = new BSAHeader();
+            var header = new BSAHeader();
             if (!recreate && _bsaReader != null)
                 header = _bsaReader.Header;
             if (header.Equals(default(BSAHeader)))
@@ -182,7 +182,7 @@ namespace BSAsharp
                 foreach (var folder in this)
                     WriteFileRecordBlock(writer, folder, header.totalFileNameLength);
 
-                allFileNames.ForEach(fileName => writer.WriteCString(fileName));
+                allFileNames.ForEach(writer.WriteCString);
 
                 allFiles.ForEach(file => WriteFileBlock(writer, file));
 
@@ -251,7 +251,7 @@ namespace BSAsharp
             //take extension of each bsafile name, take distinct, convert to uppercase
             var extSet = new HashSet<string>(
                 allFiles
-                .Select(filename => Path.GetExtension(filename))
+                .Select(Path.GetExtension)
                 .Distinct()
                 .Select(ext => ext.ToUpperInvariant()));
 

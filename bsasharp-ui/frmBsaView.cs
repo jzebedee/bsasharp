@@ -19,22 +19,27 @@ namespace bsasharp_ui
 
             var testBsa = new Bsa(@"X:\Storage\WorkTTW\release-2\release-2\resources\TTW Data\TTW Files\Main Files\TaleOfTwoWastelands.bsa");
             var bsaTree = new BsaTree(testBsa);
-            treeBsa.Tag = testBsa;
 
-            var bsaFiles = from file in testBsa.SelectMany(folder => folder)
-                           group file by file.Path.Split('\\');
-
-            var bsaFolders =
-                from folder in testBsa
-                group folder by folder.Path.Split('\\');
-
-            treeBsa.Nodes.AddRange(testBsa.Select(folder => new TreeNode(folder.Path, folder.Count == 0 ? Enumerable.Empty<TreeNode>().ToArray() : new[] { new TreeNode() })).ToArray());
+            treeBsa.Nodes.AddRange(bsaTree.Nodes.ToArray());
         }
 
-        private void treeBsa_AfterExpand(dynamic sender, TreeViewEventArgs e)
+        private void treeBsa_AfterExpand(object sender, TreeViewEventArgs e)
         {
-            var bsa = sender.Tag;
-            Console.WriteLine(e);
+            var expando = e.Node.Tag as IDictionary<string, object>;
+            var nodes = e.Node.Nodes;
+            nodes.RemoveByKey("_");
+
+            if (expando != null)
+            {
+                foreach (var kvp in expando)
+                {
+                    var newNode = new TreeNode(kvp.Key) { Tag = kvp.Value };
+                    if (kvp.Value is IDictionary<string, object>)
+                        newNode.Nodes.Add("_", "");
+                    nodes.Add(newNode);
+                }
+                e.Node.Tag = null;
+            }
         }
     }
 }

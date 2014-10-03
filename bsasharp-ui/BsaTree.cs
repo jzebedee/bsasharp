@@ -31,9 +31,19 @@ namespace bsasharp_ui
                     if (!currentExpando.ContainsKey(chunk))
                         currentExpando.Add(chunk, (currentExpando = new ExpandoObject()));
                 }
+
+                foreach (var file in folder)
+                {
+                    currentExpando.Add(file.Name, file);
+                }
             }
 
-            Nodes = _bsaExpando.Select(exp => new TreeNode(exp.Key) { Tag = exp.Value });
+            Nodes = _bsaExpando.Select(exp =>
+            {
+                var newNode = new TreeNode(exp.Key) { Tag = exp.Value };
+                newNode.Nodes.Add("_", "");
+                return newNode;
+            });
         }
 
         public IEnumerable<TreeNode> Nodes { get; private set; }

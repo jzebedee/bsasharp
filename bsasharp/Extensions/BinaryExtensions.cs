@@ -67,7 +67,7 @@ namespace BSAsharp.Extensions
 
         public static string TrimStart(this string str, string toTrim)
         {
-            if (str.Length >= toTrim.Length && str.IndexOf(toTrim, 0, toTrim.Length, System.StringComparison.Ordinal) == 0)
+            if (str.Length >= toTrim.Length && str.IndexOf(toTrim, 0, toTrim.Length, StringComparison.Ordinal) == 0)
                 return str.Substring(Math.Min(str.Length, toTrim.Length + 1));
 
             return str;

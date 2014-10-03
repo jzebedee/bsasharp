@@ -49,7 +49,7 @@ namespace BSAsharp
 
         public static byte[] Compress(Stream decompressedStream, int level = 6)
         {
-            using (MemoryStream msCompressed = new MemoryStream())
+            using (var msCompressed = new MemoryStream())
             {
                 using (var defStream = MakeZlibDeflateStream(msCompressed, level))
                 {

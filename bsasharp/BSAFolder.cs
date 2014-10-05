@@ -1,4 +1,6 @@
-﻿using BSAsharp.Extensions;
+﻿using System.Threading;
+using System.Threading.Tasks;
+using BSAsharp.Extensions;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,7 +22,7 @@ namespace BSAsharp
         {
             //Must be all lower case, and use backslash as directory delimiter
             Path = Util.FixPath(path);
-            Hash = Util.CreateHash(Path, "");
+            Hash = Util.CreateHash(Path);
         }
         private BsaFolder(IEnumerable<BsaFile> collection)
             : base(collection ?? new SortedSet<BsaFile>(), BsaHashComparer.Instance)
@@ -29,15 +31,38 @@ namespace BSAsharp
 
         public void Unpack(string outFolder)
         {
+            EnsureDirectory(outFolder);
+            foreach (var file in this)
+            {
+                var outFilepath = System.IO.Path.Combine(outFolder, file.Filename);
+                using (Stream
+                    outFilestream = File.OpenWrite(outFilepath),
+                    bsaFilestream = file.GetContentStream(true))
+                {
+                    bsaFilestream.CopyTo(outFilestream);
+                }
+            }
+        }
+        public IEnumerable<Task> UnpackAsync(string outFolder, int bufferSize = 4096, CancellationToken? token = null)
+        {
+            EnsureDirectory(outFolder);
+            foreach (var file in this)
+            {
+                var outFilepath = System.IO.Path.Combine(outFolder, file.Filename);
+                using (Stream
+                    outFilestream = File.OpenWrite(outFilepath),
+                    bsaFilestream = file.GetContentStream(true))
+                {
+                    yield return bsaFilestream.CopyToAsync(outFilestream, bufferSize, token ?? CancellationToken.None);
+                }
+            }
+        }
+
+        private void EnsureDirectory(string outFolder)
+        {
             var outPath = System.IO.Path.Combine(outFolder, Path);
             if (!Directory.Exists(outPath))
                 Directory.CreateDirectory(outPath);
-
-            foreach (var file in this)
-            {
-                var filePath = System.IO.Path.Combine(outFolder, file.Filename);
-                File.WriteAllBytes(filePath, file.GetContents(true));
-            }
         }
 
         public override string ToString()

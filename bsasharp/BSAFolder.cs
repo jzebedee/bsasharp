@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using BSAsharp.Extensions;
 using System.Collections.Generic;
@@ -20,6 +21,9 @@ namespace BSAsharp
         public BsaFolder(string path, IEnumerable<BsaFile> children = null)
             : this(children)
         {
+            if(string.IsNullOrEmpty(path))
+                throw new ArgumentException("Folder must have a path");
+
             //Must be all lower case, and use backslash as directory delimiter
             Path = Util.FixPath(path);
             Hash = Util.CreateHash(Path);

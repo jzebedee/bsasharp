@@ -96,6 +96,9 @@ namespace BSAsharp
 
             foreach (var g in groupedFiles)
             {
+                if(string.IsNullOrEmpty(g.Key))
+                    throw new InvalidOperationException("BSAs may not contain top-level files");
+
                 BsaFolder folder = this.SingleOrDefault(f => f.Path == g.Key);
                 if (folder == null)
                     Add((folder = new BsaFolder(g.Key)));

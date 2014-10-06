@@ -69,6 +69,7 @@
     <Compile Include="Format\FolderRecord.cs" />
     <Compile Include="IBsaEntry.cs" />
     <Compile Include="BsaReader.cs" />
+    <Compile Include="Progress\UnpackProgress.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Zlib.cs" />
   </ItemGroup>

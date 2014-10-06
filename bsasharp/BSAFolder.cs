@@ -5,6 +5,7 @@ using BSAsharp.Extensions;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using BSAsharp.Progress;
 
 namespace BSAsharp
 {
@@ -21,7 +22,7 @@ namespace BSAsharp
         public BsaFolder(string path, IEnumerable<BsaFile> children = null)
             : this(children)
         {
-            if(string.IsNullOrEmpty(path))
+            if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("Folder must have a path");
 
             //Must be all lower case, and use backslash as directory delimiter
@@ -33,36 +34,54 @@ namespace BSAsharp
         {
         }
 
+        /// <summary>
+        /// Saves every BsaFile in this BsaFolder to the directory specified by outFolder
+        /// </summary>
+        /// <param name="outFolder">The directory to place unpacked files</param>
         public void Unpack(string outFolder)
         {
-            EnsureDirectory(outFolder);
+            EnsureDirectoryExists(outFolder);
             foreach (var file in this)
             {
                 var outFilepath = System.IO.Path.Combine(outFolder, file.Filename);
                 using (Stream
                     outFilestream = File.OpenWrite(outFilepath),
                     bsaFilestream = file.GetContentStream(true))
-                {
                     bsaFilestream.CopyTo(outFilestream);
-                }
             }
         }
-        public IEnumerable<Task> UnpackAsync(string outFolder, int bufferSize = 4096, CancellationToken? token = null)
+        /// <summary>
+        /// Asynchronously saves every BsaFile in this BsaFolder to the directory specified by outFolder, with support for progress and cancellation
+        /// </summary>
+        /// <param name="outFolder">The directory to place unpacked files</param>
+        /// <param name="progress">An object to receive progress updates, or null</param>
+        /// <param name="token">A CancellationToken used to end the unpack operation prematurely, or null</param>
+        /// <returns></returns>
+        public async Task UnpackAsync(string outFolder, IProgress<UnpackProgress> progress = null, /*int bufferSize = 4096, */CancellationToken? token = null)
         {
-            EnsureDirectory(outFolder);
+            EnsureDirectoryExists(outFolder);
+            var setToken = token ?? CancellationToken.None;
+            var count = 0;
+
             foreach (var file in this)
+            //Parallel.ForEach(this, new ParallelOptions { CancellationToken = setToken }, async file =>
             {
+                if (setToken.IsCancellationRequested)
+                    return;
+
                 var outFilepath = System.IO.Path.Combine(outFolder, file.Filename);
                 using (Stream
                     outFilestream = File.OpenWrite(outFilepath),
                     bsaFilestream = file.GetContentStream(true))
                 {
-                    yield return bsaFilestream.CopyToAsync(outFilestream, bufferSize, token ?? CancellationToken.None);
+                    await bsaFilestream.CopyToAsync(outFilestream, 0x1000/*default*/, setToken);
+                    if (progress != null)
+                        progress.Report(new UnpackProgress(file.Filename, ++count, Count));
                 }
             }
         }
 
-        private void EnsureDirectory(string outFolder)
+        private void EnsureDirectoryExists(string outFolder)
         {
             var outPath = System.IO.Path.Combine(outFolder, Path);
             if (!Directory.Exists(outPath))

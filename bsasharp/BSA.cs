@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
+using System.Threading.Tasks;
 using BSAsharp.Extensions;
 using BSAsharp.Format;
+using BSAsharp.Progress;
 
 namespace BSAsharp
 {
@@ -96,7 +98,7 @@ namespace BSAsharp
 
             foreach (var g in groupedFiles)
             {
-                if(string.IsNullOrEmpty(g.Key))
+                if (string.IsNullOrEmpty(g.Key))
                     throw new InvalidOperationException("BSAs may not contain top-level files");
 
                 BsaFolder folder = this.SingleOrDefault(f => f.Path == g.Key);
@@ -113,6 +115,12 @@ namespace BSAsharp
             }
         }
 
+        public async Task UnpackAsync(string outFolder, IProgress<UnpackProgress> progress = null)
+        {
+            foreach (var folder in this)
+                await folder.UnpackAsync(outFolder, progress);
+        }
+
         public void Unpack(string outFolder)
         {
             foreach (var folder in this)
@@ -124,7 +132,7 @@ namespace BSAsharp
             outBsa = Path.GetFullPath(outBsa);
 
             var outBsaDir = Path.GetDirectoryName(outBsa);
-            if(!string.IsNullOrEmpty(outBsaDir))
+            if (!string.IsNullOrEmpty(outBsaDir))
                 Directory.CreateDirectory(outBsaDir);
             File.Delete(outBsa);
 

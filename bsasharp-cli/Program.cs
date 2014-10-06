@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using BSAsharp;
+using BSAsharp.Progress;
 
 namespace BSAsharp_cli
 {
@@ -91,7 +92,11 @@ namespace BSAsharp_cli
                         }
 #endif
                             if (unpackFolder != null)
-                                wrapper.Unpack(unpackFolder);
+                            {
+                                var prog = new Progress<UnpackProgress>();
+                                prog.ProgressChanged += (sender, e) => Console.WriteLine("{0} done, {1}/{2}", e.Filename, e.Count, e.Total);
+                                wrapper.UnpackAsync(unpackFolder, prog).Wait();
+                            }
                             if (outFile != null)
                                 wrapper.Save(outFile);
                         }

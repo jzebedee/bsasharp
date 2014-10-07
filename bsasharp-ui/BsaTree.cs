@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Dynamic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using BSAsharp;
+using Humanizer;
 
 namespace bsasharp_ui
 {
@@ -14,38 +10,45 @@ namespace bsasharp_ui
         private readonly Bsa _bsa;
         private readonly IDictionary<string, object> _bsaExpando;
 
+        public dynamic Expando
+        {
+            get { return _bsaExpando as ExpandoObject; }
+        }
+
         public BsaTree(Bsa bsa)
         {
             _bsa = bsa;
             _bsaExpando = new ExpandoObject();
+            CreateStructure();
+        }
 
-            IDictionary<string, object> /*previousExpando, */currentExpando;
-            foreach (var folder in bsa)
+        private void CreateStructure()
+        {
+            foreach (var folder in _bsa)
             {
-                currentExpando = _bsaExpando;
+                var currentDict = _bsaExpando;
 
                 var splitPath = folder.Path.Split('\\');
                 foreach (var chunk in splitPath)
                 {
                     //previousExpando = currentExpando;
-                    if (!currentExpando.ContainsKey(chunk))
-                        currentExpando.Add(chunk, (currentExpando = new ExpandoObject()));
+                    if (!currentDict.ContainsKey(chunk))
+                        currentDict.Add(chunk, (currentDict = new ExpandoObject()));
                 }
 
                 foreach (var file in folder)
                 {
-                    currentExpando.Add(file.Name, file);
+                    var sizeText = file.OriginalSize.Bytes().Humanize("0.00");
+                    if (file.IsCompressed)
+                        sizeText += " (" + file.Size.Bytes().Humanize("0.00") + " compressed)";
+
+                    currentDict.Add(file.Name, new
+                    {
+                        File = file,
+                        SizeText = sizeText
+                    });
                 }
             }
-
-            Nodes = _bsaExpando.Select(exp =>
-            {
-                var newNode = new TreeNode(exp.Key) { Tag = exp.Value };
-                newNode.Nodes.Add("_", "");
-                return newNode;
-            });
         }
-
-        public IEnumerable<TreeNode> Nodes { get; private set; }
     }
 }

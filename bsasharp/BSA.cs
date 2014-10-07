@@ -183,7 +183,7 @@ namespace BSAsharp
                 header.Write(writer);
 
                 foreach (var folder in this)
-                    WriteFolderRecord(writer, folder, CreateFolderRecord(folder));
+                    WriteFolderRecord(writer, folder);
 
 #if PARALLEL
                 //parallel pump the files, as checking RecordSize may
@@ -215,30 +215,10 @@ namespace BSAsharp
             writer.Write(file.GetSaveData());
         }
 
-        private FolderRecord CreateFolderRecord(BsaFolder folder)
-        {
-            return new FolderRecord
-            {
-                hash = folder.Hash,
-                count = (uint)folder.Count(),
-                offset = 0
-            };
-        }
-
-        private void WriteFolderRecord(BinaryWriter writer, BsaFolder folder, FolderRecord rec)
+        private void WriteFolderRecord(BinaryWriter writer, BsaFolder folder)
         {
             _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SizeRecordOffset);
-            rec.Write(writer);
-        }
-
-        private FileRecord CreateFileRecord(BsaFile file)
-        {
-            return new FileRecord
-            {
-                hash = file.Hash,
-                size = file.CalculateRecordSize(),
-                offset = 0
-            };
+            folder.Record.Write(writer);
         }
 
         private void WriteFileRecordBlock(BinaryWriter writer, BsaFolder folder, uint totalFileNameLength)
@@ -248,10 +228,8 @@ namespace BSAsharp
 
             foreach (var file in folder)
             {
-                var record = CreateFileRecord(file);
-
                 _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SizeRecordOffset);
-                record.Write(writer);
+                file.Record.Write(writer);
             }
         }
 

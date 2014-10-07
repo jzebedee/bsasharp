@@ -5,6 +5,7 @@ using BSAsharp.Extensions;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using BSAsharp.Format;
 using BSAsharp.Progress;
 
 namespace BSAsharp
@@ -18,6 +19,18 @@ namespace BSAsharp
         public string Path { get; private set; }
 
         public ulong Hash { get; private set; }
+
+        internal FolderRecord Record
+        {
+            get
+            {
+                return new FolderRecord
+                {
+                    hash = Hash,
+                    count = (uint)Count,
+                };
+            }
+        }
 
         public BsaFolder(string path, IEnumerable<BsaFile> children = null)
             : this(children)

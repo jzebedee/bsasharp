@@ -45,6 +45,18 @@ namespace BSAsharp
             }
         }
 
+        internal FileRecord Record
+        {
+            get
+            {
+                return new FileRecord
+                {
+                    hash = Hash,
+                    size = CalculateRecordSize(),
+                };
+            }
+        }
+
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
         public ulong Hash { get; private set; }
 
@@ -154,7 +166,7 @@ namespace BSAsharp
             return Filename;
         }
 
-        public uint CalculateRecordSize()
+        private uint CalculateRecordSize()
         {
             ForceCompressionIfNeeded();
 

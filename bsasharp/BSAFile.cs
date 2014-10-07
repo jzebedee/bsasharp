@@ -169,15 +169,13 @@ namespace BSAsharp
 
         private void CheckCompressionSettings()
         {
-            _optDeflateLevel = Options.GetCompressionLevel(System.IO.Path.GetExtension(Name));
-            if (_optDeflateLevel.HasValue && _optDeflateLevel.Value < 0)
+            int extDeflateLevel;
+            if (Options.ExtensionCompressionLevel.TryGetValue(System.IO.Path.GetExtension(Name), out extDeflateLevel))
             {
-                //blocks compression changing on this file
-                _forceCompressionChecked = true;
-            }
-            else
-            {
-                _forceCompressionChecked = false;
+                _optDeflateLevel = extDeflateLevel;
+                if (_optDeflateLevel < 0)
+                    //blocks compression changing on this file
+                    _forceCompressionChecked = true;
             }
         }
 

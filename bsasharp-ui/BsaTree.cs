@@ -12,13 +12,13 @@ namespace bsasharp_ui
 
         public dynamic Expando
         {
-            get { return _bsaExpando as ExpandoObject; }
+            get { return _bsaExpando; }
         }
 
         public BsaTree(Bsa bsa)
         {
             _bsa = bsa;
-            _bsaExpando = new ExpandoObject();
+            _bsaExpando = CreateNodeExpando();
             CreateStructure();
         }
 
@@ -26,14 +26,14 @@ namespace bsasharp_ui
         {
             foreach (var folder in _bsa)
             {
-                var currentDict = _bsaExpando;
+                var current = _bsaExpando;
 
                 var splitPath = folder.Path.Split('\\');
                 foreach (var chunk in splitPath)
                 {
                     //previousExpando = currentExpando;
-                    if (!currentDict.ContainsKey(chunk))
-                        currentDict.Add(chunk, (currentDict = new ExpandoObject()));
+                    if (!current.ContainsKey(chunk))
+                        current.Add(chunk, (current = CreateNodeExpando()));
                 }
 
                 foreach (var file in folder)
@@ -42,13 +42,18 @@ namespace bsasharp_ui
                     if (file.IsCompressed)
                         sizeText += " (" + file.Size.Bytes().Humanize("0.00") + " compressed)";
 
-                    currentDict.Add(file.Name, new
+                    current.Add(file.Name, new
                     {
                         File = file,
                         SizeText = sizeText
                     });
                 }
             }
+        }
+
+        private static dynamic CreateNodeExpando()
+        {
+            return new ExpandoObject();
         }
     }
 }

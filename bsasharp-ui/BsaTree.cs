@@ -1,24 +1,18 @@
-﻿using System.Collections.Generic;
-using System.Dynamic;
+﻿using System.Linq;
 using BSAsharp;
-using Humanizer;
 
 namespace bsasharp_ui
 {
     class BsaTree
     {
         private readonly Bsa _bsa;
-        private readonly IDictionary<string, object> _bsaExpando;
 
-        public dynamic Expando
-        {
-            get { return _bsaExpando; }
-        }
+        public BsaNode Root { get; private set; }
 
         public BsaTree(Bsa bsa)
         {
             _bsa = bsa;
-            _bsaExpando = CreateNodeExpando();
+            Root = new BsaNode();
             CreateStructure();
         }
 
@@ -26,34 +20,21 @@ namespace bsasharp_ui
         {
             foreach (var folder in _bsa)
             {
-                var current = _bsaExpando;
+                var current = Root;
 
                 var splitPath = folder.Path.Split('\\');
                 foreach (var chunk in splitPath)
                 {
                     //previousExpando = currentExpando;
-                    if (!current.ContainsKey(chunk))
-                        current.Add(chunk, (current = CreateNodeExpando()));
+                    if (current.All(node => node.Text != chunk))
+                        current.Add((current = new BsaNode { Text = chunk }));
                 }
 
-                foreach (var file in folder)
+                current.AddRange(folder.Select(file => new BsaNode
                 {
-                    var sizeText = file.OriginalSize.Bytes().Humanize("0.00");
-                    if (file.IsCompressed)
-                        sizeText += " (" + file.Size.Bytes().Humanize("0.00") + " compressed)";
-
-                    current.Add(file.Name, new
-                    {
-                        File = file,
-                        SizeText = sizeText
-                    });
-                }
+                    Text = file.Name, Tag = file, Size = (int) file.OriginalSize
+                }));
             }
-        }
-
-        private static dynamic CreateNodeExpando()
-        {
-            return new ExpandoObject();
         }
     }
 }

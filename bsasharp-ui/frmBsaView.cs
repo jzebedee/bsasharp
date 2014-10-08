@@ -23,14 +23,14 @@ namespace bsasharp_ui
             var testBsa = new Bsa(@"X:\Storage\WorkTTW\release-2\release-2\resources\TTW Data\TTW Files\Main Files\TaleOfTwoWastelands.bsa");
             var testTree = new BsaTree(testBsa);
 
-            treeBsa.CanExpandGetter = (dynamic model) => model.Value is ExpandoObject;
-            treeBsa.ChildrenGetter = (dynamic model) => model.Value;
-            treeBsa.CustomSorter = (column, order) =>
-            {
-                Console.WriteLine("", column, order);
-            };
+            treeBsa.CanExpandGetter = (dynamic model) => model.Count > 0;
+            treeBsa.ChildrenGetter = (dynamic model) => model;
 
-            treeBsa.SetObjects(testTree.Expando);
+            olvColumnSize.AspectToStringConverter = (dynamic model, dynamic value) => model.SizeText;
+
+            treeBsa.BeginUpdate();
+            treeBsa.SetObjects(testTree.Root);
+            treeBsa.EndUpdate();
 
             //dlgOpenBsa.ShowDialog();
         }

@@ -16,8 +16,9 @@
     </UpgradeBackupLocation>
     <OldToolsVersion>3.5</OldToolsVersion>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>olv-keyfile.snk</AssemblyOriginatorKeyFile>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -163,15 +164,11 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="CustomDictionary.xml" />
-    <None Include="FullClassDiagram.cd" />
     <None Include="Resources\sort-descending.png" />
     <None Include="Resources\sort-ascending.png" />
     <None Include="Resources\filter.png" />
     <None Include="Resources\clear-filter.png" />
     <None Include="Resources\filter-icons3.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="olv-keyfile.snk" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">

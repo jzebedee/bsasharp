@@ -31,8 +31,6 @@
             this.components = new System.ComponentModel.Container();
             this.splitContainer = new System.Windows.Forms.SplitContainer();
             this.treeBsa = new BrightIdeasSoftware.TreeListView();
-            this.ttipBsa = new System.Windows.Forms.ToolTip(this.components);
-            this.dlgOpenBsa = new System.Windows.Forms.OpenFileDialog();
             this.olvColumnPath = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.olvColumnSize = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.flpControls = new System.Windows.Forms.FlowLayoutPanel();
@@ -40,6 +38,8 @@
             this.button2 = new System.Windows.Forms.Button();
             this.button3 = new System.Windows.Forms.Button();
             this.button4 = new System.Windows.Forms.Button();
+            this.ttipBsa = new System.Windows.Forms.ToolTip(this.components);
+            this.dlgOpenBsa = new System.Windows.Forms.OpenFileDialog();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).BeginInit();
             this.splitContainer.Panel1.SuspendLayout();
             this.splitContainer.Panel2.SuspendLayout();
@@ -74,7 +74,7 @@
             this.olvColumnPath,
             this.olvColumnSize});
             this.treeBsa.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.treeBsa.HeaderUsesThemes = false;
+            this.treeBsa.FullRowSelect = true;
             this.treeBsa.Location = new System.Drawing.Point(0, 0);
             this.treeBsa.Name = "treeBsa";
             this.treeBsa.OwnerDraw = true;
@@ -83,27 +83,25 @@
             this.treeBsa.TabIndex = 1;
             this.treeBsa.UseAlternatingBackColors = true;
             this.treeBsa.UseCompatibleStateImageBehavior = false;
-            this.treeBsa.UseExplorerTheme = true;
             this.treeBsa.UseFilterIndicator = true;
             this.treeBsa.UseFiltering = true;
+            this.treeBsa.UseHotItem = true;
+            this.treeBsa.UseTranslucentHotItem = true;
+            this.treeBsa.UseTranslucentSelection = true;
             this.treeBsa.View = System.Windows.Forms.View.Details;
             this.treeBsa.VirtualMode = true;
             // 
-            // dlgOpenBsa
-            // 
-            this.dlgOpenBsa.DefaultExt = "bsa";
-            this.dlgOpenBsa.Filter = "Bethesda Archive|*.bsa";
-            // 
             // olvColumnPath
             // 
-            this.olvColumnPath.AspectName = "Key";
+            this.olvColumnPath.AspectName = "Text";
             this.olvColumnPath.CellPadding = null;
             this.olvColumnPath.FillsFreeSpace = true;
             this.olvColumnPath.Text = "Path";
             // 
             // olvColumnSize
             // 
-            this.olvColumnSize.AspectName = "Value.SizeText";
+            this.olvColumnSize.AspectName = "Size";
+            this.olvColumnSize.AspectToStringFormat = "";
             this.olvColumnSize.CellPadding = null;
             this.olvColumnSize.FillsFreeSpace = true;
             this.olvColumnSize.MaximumWidth = 200;
@@ -158,6 +156,11 @@
             this.button4.TabIndex = 3;
             this.button4.Text = "sexyD";
             this.button4.UseVisualStyleBackColor = true;
+            // 
+            // dlgOpenBsa
+            // 
+            this.dlgOpenBsa.DefaultExt = "bsa";
+            this.dlgOpenBsa.Filter = "Bethesda Archive|*.bsa";
             // 
             // frmBsaView
             // 

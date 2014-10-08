@@ -8534,7 +8534,7 @@ namespace BrightIdeasSoftware
         {
             object cellValue = column.GetValue(rowObject);
             OLVListSubItem subItem = new OLVListSubItem(cellValue,
-                                                        column.ValueToString(cellValue),
+                                                        column.ValueToString(rowObject, cellValue),
                                                         column.GetImage(rowObject));
             if (UseHyperlinks && column.Hyperlink)
             {

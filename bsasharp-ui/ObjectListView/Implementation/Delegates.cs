@@ -47,7 +47,7 @@ namespace BrightIdeasSoftware {
     /// These delegates can be used to convert an aspect value to a display string,
     /// instead of using the default ToString()
     /// </summary>
-    public delegate string AspectToStringConverterDelegate(Object value);
+    public delegate string AspectToStringConverterDelegate(Object rowObject, Object value);
 
     /// <summary>
     /// These delegates are used to get the tooltip for a cell

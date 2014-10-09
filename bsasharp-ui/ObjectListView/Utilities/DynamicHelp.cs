@@ -10,22 +10,10 @@ namespace BrightIdeasSoftware.Utilities
     {
         internal static dynamic Get(object model, string aspect)
         {
-            try
-            {
-                return Dynamic.InvokeGetChain(model, aspect);
-                return aspect.Any(c => c == '.')
-                    ? Dynamic.InvokeGetChain(model, aspect)
-                    : Dynamic.InvokeGet(model, aspect);
-            }
-            catch (RuntimeBinderException)
-            {
-                //IgnoredTypes.Add(model.GetType(), aspect);
-            }
-
-            return null;
+            return Dynamic.InvokeGetChain(model, aspect);
         }
 
-        internal static dynamic Set(object model, string aspect, object value)
+        internal static object Set(object model, string aspect, object value)
         {
             return Dynamic.InvokeSetChain(model, aspect, value);
         }

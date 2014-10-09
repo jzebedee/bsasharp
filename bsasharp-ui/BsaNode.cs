@@ -18,11 +18,11 @@ namespace bsasharp_ui
             {
                 if (Tag != null)
                 {
-                    var file = Tag as BsaFile;
+                    Debug.Assert(Tag != null);
 
-                    var sizeText = file.OriginalSize.Bytes().Humanize("0.00");
-                    if (file.IsCompressed)
-                        sizeText += " (" + file.Size.Bytes().Humanize("0.00") + " compressed)";
+                    var sizeText = Tag.OriginalSize.Bytes().Humanize("0.00");
+                    if (Tag.IsCompressed)
+                        sizeText += " (" + Tag.Size.Bytes().Humanize("0.00") + " compressed)";
 
                     return sizeText;
                 }
@@ -37,14 +37,22 @@ namespace bsasharp_ui
         {
             get
             {
-                if (_size.HasValue)
-                    return _size.Value;
-
-                return Descendants.Where(node => node.Tag == null).Sum(node => node.Size);
+                return _size.HasValue ? _size.Value : Descendants.Where(node => node.Tag == null).Sum(node => node.Size);
             }
             set { _size = value; }
         }
-        public object Tag { get; set; }
+
+        public string CompressionLevel
+        {
+            get
+            {
+                if (Tag == null)
+                    return "";
+
+                return string.Format("{0}", Tag.Strategy.Humanize());
+            }
+        }
+        public BsaFile Tag { get; set; }
 
         public IEnumerable<BsaNode> DescendantsAndSelf
         {

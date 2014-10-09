@@ -36,6 +36,9 @@
     <Reference Include="Dynamitey">
       <HintPath>..\packages\Dynamitey.1.0.2.0\lib\net40\Dynamitey.dll</HintPath>
     </Reference>
+    <Reference Include="Gma.DataStructures.StringSearch">
+      <HintPath>.\Gma.DataStructures.StringSearch.dll</HintPath>
+    </Reference>
     <Reference Include="Humanizer">
       <HintPath>..\packages\Humanizer.1.29.0\lib\portable-win+net40+sl50+wp8+wpa81\Humanizer.dll</HintPath>
     </Reference>
@@ -62,6 +65,7 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <None Include="SuffixFilter.cs" />
     <EmbeddedResource Include="frmBsaView.resx">
       <DependentUpon>frmBsaView.cs</DependentUpon>
     </EmbeddedResource>

@@ -55,7 +55,7 @@ namespace BSAsharp
         private bool _forceCompressionChecked;
         private int? _optDeflateLevel;
 
-        private CompressionOptions Options
+        public CompressionOptions Options
         {
             get
             {
@@ -63,7 +63,7 @@ namespace BSAsharp
             }
         }
 
-        private CompressionStrategy Strategy
+        public CompressionStrategy Strategy
         {
             get
             {

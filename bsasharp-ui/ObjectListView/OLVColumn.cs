@@ -1027,7 +1027,7 @@ namespace BrightIdeasSoftware
             if (GroupKeyToTitleConverter != null)
                 return GroupKeyToTitleConverter(value);
 
-            return value == null ? ObjectListView.GroupTitleDefault : ValueToString(value);
+            return value == null ? ObjectListView.GroupTitleDefault : ValueToString(null, value);
         }
 
         /// <summary>
@@ -1201,6 +1201,9 @@ namespace BrightIdeasSoftware
         /// <returns>A string representation of the aspect</returns>
         public string ValueToString(object rowObject, object value = null)
         {
+            if (rowObject == null)
+                return "";
+
             value = value ?? GetValue(rowObject);
 
             // Give the installed converter a chance to work (even if the value is null)

@@ -1,17 +1,21 @@
 ﻿using System.Linq;
 using BSAsharp;
+using Gma.DataStructures.StringSearch;
 
 namespace bsasharp_ui
 {
-    class BsaTree
+    public class BsaTree
     {
         private readonly Bsa _bsa;
+
+        public PatriciaSuffixTrie<string> FileNameTrie { get; private set; }
 
         public BsaNode Root { get; private set; }
 
         public BsaTree(Bsa bsa)
         {
             _bsa = bsa;
+            FileNameTrie = new PatriciaSuffixTrie<string>(1);
             Root = new BsaNode();
             CreateStructure();
         }
@@ -30,10 +34,11 @@ namespace bsasharp_ui
                         current.Add((current = new BsaNode { Text = chunk }));
                 }
 
-                current.AddRange(folder.Select(file => new BsaNode
+                foreach (var file in folder)
                 {
-                    Text = file.Name, Tag = file, Size = (int) file.OriginalSize
-                }));
+                    FileNameTrie.Add(file.Name, file.Name);
+                    current.Add(new BsaNode { Text = file.Name, Tag = file, Size = (int)file.OriginalSize });
+                }
             }
         }
     }

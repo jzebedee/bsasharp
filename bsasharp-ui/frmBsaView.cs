@@ -56,7 +56,8 @@ namespace bsasharp_ui
                     return true;
 
                 var matches = _tree.FileNameTrie.Retrieve(filter);
-                return node.DescendantsAndSelf.Any(subnode => matches.Contains(subnode.Text));
+                var matchesEtc = matches.SelectMany(match => match.DescendantsAndSelf);
+                return node.DescendantsAndSelf.Any(matchesEtc.Contains);
             });
         }
 

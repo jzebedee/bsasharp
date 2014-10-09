@@ -8,14 +8,14 @@ namespace bsasharp_ui
     {
         private readonly Bsa _bsa;
 
-        public PatriciaSuffixTrie<string> FileNameTrie { get; private set; }
+        public PatriciaSuffixTrie<BsaNode> FileNameTrie { get; private set; }
 
         public BsaNode Root { get; private set; }
 
         public BsaTree(Bsa bsa)
         {
             _bsa = bsa;
-            FileNameTrie = new PatriciaSuffixTrie<string>(1);
+            FileNameTrie = new PatriciaSuffixTrie<BsaNode>(1);
             Root = new BsaNode();
             CreateStructure();
         }
@@ -31,13 +31,23 @@ namespace bsasharp_ui
                 {
                     //previousExpando = currentExpando;
                     if (current.All(node => node.Text != chunk))
+                    {
                         current.Add((current = new BsaNode { Text = chunk }));
+                        FileNameTrie.Add(chunk, current);
+                    }
                 }
 
                 foreach (var file in folder)
                 {
-                    FileNameTrie.Add(file.Name, file.Name);
-                    current.Add(new BsaNode { Text = file.Name, Tag = file, Size = (int)file.OriginalSize });
+                    var fileNode = new BsaNode
+                    {
+                        Text = file.Name,
+                        Tag = file,
+                        Size = (int) file.OriginalSize
+                    };
+
+                    FileNameTrie.Add(file.Name, fileNode);
+                    current.Add(fileNode);
                 }
             }
         }

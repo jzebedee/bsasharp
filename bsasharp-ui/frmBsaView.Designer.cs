@@ -34,11 +34,6 @@
             this.olvColumnPath = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.olvColumnSize = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.olvColumnCompression = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
-            this.flpControls = new System.Windows.Forms.FlowLayoutPanel();
-            this.grpFilter = new System.Windows.Forms.GroupBox();
-            this.txtFilter = new System.Windows.Forms.TextBox();
-            this.ttipBsa = new System.Windows.Forms.ToolTip(this.components);
-            this.dlgOpenBsa = new System.Windows.Forms.OpenFileDialog();
             this.contextMenuStripBsaTree = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.unpackToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deleteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -53,14 +48,21 @@
             this.level7ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.level8ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.level9ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.flpControls = new System.Windows.Forms.FlowLayoutPanel();
+            this.grpFilter = new System.Windows.Forms.GroupBox();
+            this.txtFilter = new System.Windows.Forms.TextBox();
+            this.ttipBsa = new System.Windows.Forms.ToolTip(this.components);
+            this.dlgOpenBsa = new System.Windows.Forms.OpenFileDialog();
+            this.btnSaveBsa = new System.Windows.Forms.Button();
+            this.dlgSaveBsa = new System.Windows.Forms.SaveFileDialog();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).BeginInit();
             this.splitContainer.Panel1.SuspendLayout();
             this.splitContainer.Panel2.SuspendLayout();
             this.splitContainer.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.treeBsa)).BeginInit();
+            this.contextMenuStripBsaTree.SuspendLayout();
             this.flpControls.SuspendLayout();
             this.grpFilter.SuspendLayout();
-            this.contextMenuStripBsaTree.SuspendLayout();
             this.SuspendLayout();
             // 
             // splitContainer
@@ -138,44 +140,6 @@
             this.olvColumnCompression.Text = "Compression";
             this.olvColumnCompression.UseFiltering = false;
             this.olvColumnCompression.Width = 80;
-            // 
-            // flpControls
-            // 
-            this.flpControls.Controls.Add(this.grpFilter);
-            this.flpControls.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.flpControls.Location = new System.Drawing.Point(0, 0);
-            this.flpControls.MinimumSize = new System.Drawing.Size(100, 200);
-            this.flpControls.Name = "flpControls";
-            this.flpControls.Size = new System.Drawing.Size(165, 561);
-            this.flpControls.TabIndex = 0;
-            // 
-            // grpFilter
-            // 
-            this.grpFilter.Controls.Add(this.txtFilter);
-            this.grpFilter.Location = new System.Drawing.Point(3, 3);
-            this.grpFilter.Name = "grpFilter";
-            this.grpFilter.Size = new System.Drawing.Size(156, 40);
-            this.grpFilter.TabIndex = 8;
-            this.grpFilter.TabStop = false;
-            this.grpFilter.Text = "Filter";
-            // 
-            // txtFilter
-            // 
-            this.txtFilter.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
-            this.txtFilter.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.CustomSource;
-            this.txtFilter.CharacterCasing = System.Windows.Forms.CharacterCasing.Lower;
-            this.txtFilter.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtFilter.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtFilter.Location = new System.Drawing.Point(3, 16);
-            this.txtFilter.Name = "txtFilter";
-            this.txtFilter.Size = new System.Drawing.Size(150, 20);
-            this.txtFilter.TabIndex = 8;
-            this.txtFilter.TextChanged += new System.EventHandler(this.txtFilter_TextChanged);
-            // 
-            // dlgOpenBsa
-            // 
-            this.dlgOpenBsa.DefaultExt = "bsa";
-            this.dlgOpenBsa.Filter = "Bethesda Archive|*.bsa";
             // 
             // contextMenuStripBsaTree
             // 
@@ -275,6 +239,60 @@
             this.level9ToolStripMenuItem.Size = new System.Drawing.Size(157, 22);
             this.level9ToolStripMenuItem.Text = "Level 9 (Best)";
             // 
+            // flpControls
+            // 
+            this.flpControls.Controls.Add(this.grpFilter);
+            this.flpControls.Controls.Add(this.btnSaveBsa);
+            this.flpControls.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.flpControls.Location = new System.Drawing.Point(0, 0);
+            this.flpControls.MinimumSize = new System.Drawing.Size(100, 200);
+            this.flpControls.Name = "flpControls";
+            this.flpControls.Size = new System.Drawing.Size(165, 561);
+            this.flpControls.TabIndex = 0;
+            // 
+            // grpFilter
+            // 
+            this.grpFilter.Controls.Add(this.txtFilter);
+            this.grpFilter.Location = new System.Drawing.Point(3, 3);
+            this.grpFilter.Name = "grpFilter";
+            this.grpFilter.Size = new System.Drawing.Size(156, 40);
+            this.grpFilter.TabIndex = 8;
+            this.grpFilter.TabStop = false;
+            this.grpFilter.Text = "Filter";
+            // 
+            // txtFilter
+            // 
+            this.txtFilter.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
+            this.txtFilter.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.CustomSource;
+            this.txtFilter.CharacterCasing = System.Windows.Forms.CharacterCasing.Lower;
+            this.txtFilter.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtFilter.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.txtFilter.Location = new System.Drawing.Point(3, 16);
+            this.txtFilter.Name = "txtFilter";
+            this.txtFilter.Size = new System.Drawing.Size(150, 20);
+            this.txtFilter.TabIndex = 8;
+            this.txtFilter.TextChanged += new System.EventHandler(this.txtFilter_TextChanged);
+            // 
+            // dlgOpenBsa
+            // 
+            this.dlgOpenBsa.DefaultExt = "bsa";
+            this.dlgOpenBsa.Filter = "Bethesda Archive|*.bsa";
+            // 
+            // btnSaveBsa
+            // 
+            this.btnSaveBsa.Location = new System.Drawing.Point(3, 49);
+            this.btnSaveBsa.Name = "btnSaveBsa";
+            this.btnSaveBsa.Size = new System.Drawing.Size(75, 23);
+            this.btnSaveBsa.TabIndex = 9;
+            this.btnSaveBsa.Text = "Save BSA";
+            this.btnSaveBsa.UseVisualStyleBackColor = true;
+            this.btnSaveBsa.Click += new System.EventHandler(this.btnSaveBsa_Click);
+            // 
+            // dlgSaveBsa
+            // 
+            this.dlgSaveBsa.DefaultExt = "bsa";
+            this.dlgSaveBsa.Filter = "Bethesda Archive|*.bsa";
+            // 
             // frmBsaView
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -288,10 +306,10 @@
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer)).EndInit();
             this.splitContainer.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.treeBsa)).EndInit();
+            this.contextMenuStripBsaTree.ResumeLayout(false);
             this.flpControls.ResumeLayout(false);
             this.grpFilter.ResumeLayout(false);
             this.grpFilter.PerformLayout();
-            this.contextMenuStripBsaTree.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -322,6 +340,8 @@
         private System.Windows.Forms.ToolStripMenuItem level7ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem level8ToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem level9ToolStripMenuItem;
+        private System.Windows.Forms.Button btnSaveBsa;
+        private System.Windows.Forms.SaveFileDialog dlgSaveBsa;
 
     }
 }

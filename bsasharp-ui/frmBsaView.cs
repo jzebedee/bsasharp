@@ -19,14 +19,29 @@ namespace bsasharp_ui
 {
     public partial class frmBsaView : Form
     {
-        private BsaTree _tree;
+        private readonly BsaTree _tree;
+        private readonly Bsa _bsa;
 
         public frmBsaView()
         {
             InitializeComponent();
 
-            var testBsa = new Bsa(@"X:\Storage\WorkTTW\release-2\release-2\resources\TTW Data\TTW Files\Main Files\TaleOfTwoWastelands.bsa");
-            _tree = new BsaTree(testBsa);
+#if DEBUG
+            _bsa = new Bsa(@"X:\Storage\WorkTTW\release-2\release-2\resources\TTW Data\TTW Files\Main Files\TaleOfTwoWastelands.bsa");
+#else
+            switch (dlgOpenBsa.ShowDialog())
+            {
+                case DialogResult.OK:
+                    _bsa = new Bsa(dlgOpenBsa.FileName);
+                    break;
+                default:
+                    Environment.Exit(1);
+                    return;
+            }
+#endif
+
+            Debug.Assert(_bsa != null);
+            _tree = new BsaTree(_bsa);
 
             foreach (var text in _tree.Root.Descendants.Select(node => node.Text).Distinct())
                 txtFilter.AutoCompleteCustomSource.Add(text);
@@ -39,8 +54,6 @@ namespace bsasharp_ui
             treeBsa.BeginUpdate();
             treeBsa.SetObjects(_tree.Root);
             treeBsa.EndUpdate();
-
-            //dlgOpenBsa.ShowDialog();
         }
 
         private void SetFilter()
@@ -64,6 +77,19 @@ namespace bsasharp_ui
         private void txtFilter_TextChanged(object sender, EventArgs e)
         {
             SetFilter();
+        }
+
+        private void btnSaveBsa_Click(object sender, EventArgs e)
+        {
+            switch (dlgSaveBsa.ShowDialog())
+            {
+                case DialogResult.OK:
+                    _bsa.Save(dlgSaveBsa.FileName, true);
+                    MessageBox.Show("BSA saved");
+                    break;
+                default:
+                    break;
+            }
         }
     }
 }

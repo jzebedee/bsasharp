@@ -59,12 +59,6 @@
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\BSAsharp-framework\BSAsharp-framework.csproj">
-      <Project>{dd09d7a2-2de0-4ca3-8a59-8119dd23f7d7}</Project>
-      <Name>BSAsharp-framework</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

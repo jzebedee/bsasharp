@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp", "BSAsharp\BSAsharp.csproj", "{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp", "BSAsharp-framework\BSAsharp.csproj", "{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp-cli", "BSAsharp-cli\BSAsharp-cli.csproj", "{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}"
 EndProject

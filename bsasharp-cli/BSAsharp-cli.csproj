@@ -60,9 +60,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BSAsharp\BSAsharp.csproj">
+    <ProjectReference Include="..\BSAsharp-framework\BSAsharp-framework.csproj">
       <Project>{dd09d7a2-2de0-4ca3-8a59-8119dd23f7d7}</Project>
-      <Name>BSAsharp</Name>
+      <Name>BSAsharp-framework</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

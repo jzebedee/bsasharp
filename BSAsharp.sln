@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.30723.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.26621.2
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp", "BSAsharp-framework\BSAsharp.csproj", "{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp-framework", "BSAsharp-framework\BSAsharp-framework.csproj", "{DD09D7A2-2DE0-4CA3-8A59-8119DD23F7D7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BSAsharp-cli", "BSAsharp-cli\BSAsharp-cli.csproj", "{B7CCDC07-C0A4-45FC-919B-4BFA71D05EBA}"
 EndProject
@@ -34,5 +34,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8ECE5AC9-5A79-46EB-8FAD-A6B31CF33AFA}
 	EndGlobalSection
 EndGlobal

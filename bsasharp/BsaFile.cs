@@ -75,14 +75,6 @@ namespace BSAsharp
             }
         }
 
-        private CompressionStrategy Strategy
-        {
-            get
-            {
-                return Options.Strategy;
-            }
-        }
-
         public BsaFile(string path, string name, ArchiveSettings settings, byte[] data, bool inputCompressed)
             : this(path, name, settings)
         {
@@ -131,9 +123,6 @@ namespace BSAsharp
             _settings = settings;
 
             CheckCompressionSettings();
-
-            if (Strategy.HasFlag(CompressionStrategy.Aggressive))
-                throw new NotImplementedException("CompressionStrategy.Aggressive");
         }
 
         //Clone ctor
@@ -346,21 +335,6 @@ namespace BSAsharp
                 }
 
             return GetData();
-        }
-
-        private int GetDeflateLevel()
-        {
-            if (_optDeflateLevel.HasValue)
-                return _optDeflateLevel.Value;
-
-            if (Strategy.HasFlag(CompressionStrategy.Size | CompressionStrategy.Speed))
-                return DeflateLevelMixed;
-            if (Strategy.HasFlag(CompressionStrategy.Speed))
-                return DeflateLevelSpeed;
-            if (Strategy.HasFlag(CompressionStrategy.Size))
-                return DeflateLevelSize;
-
-            throw new ArgumentException("CompressionStrategy did not have enough information");
         }
 
         public object Clone()

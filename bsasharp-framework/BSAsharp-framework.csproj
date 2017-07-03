@@ -60,16 +60,8 @@
     <Compile Include="CompressionStrategy.cs" />
     <Compile Include="BsaHashComparer.cs" />
     <Compile Include="Bsa.cs" />
-    <Compile Include="Extensions\BinaryExtensions.cs" />
-    <Compile Include="Extensions\Util.cs" />
-    <Compile Include="Format\ArchiveFlags.cs" />
-    <Compile Include="Format\BsaHeader.cs" />
-    <Compile Include="Format\FileFlags.cs" />
-    <Compile Include="Format\FileRecord.cs" />
-    <Compile Include="Format\FolderRecord.cs" />
     <Compile Include="IBsaEntry.cs" />
     <Compile Include="BsaReader.cs" />
-    <Compile Include="Progress\UnpackProgress.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Zlib.cs" />
   </ItemGroup>

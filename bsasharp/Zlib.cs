@@ -1,20 +1,14 @@
-﻿//#define SEVENZIPSHARP
-#define SHARPZIPLIB
-using System;
+﻿using System;
 using System.IO;
-#if SHARPZIPLIB
-using ICSharpCode.SharpZipLib.Zip.Compression;
-using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
-#endif
-#if SEVENZIPSHARP
-using SevenZip;
-#endif
+using System.IO.Compression;
 
 namespace BSAsharp
 {
-    public static class Zlib
+    public class Zlib
     {
-        public static byte[] Decompress(Stream compressedStream, uint originalSize)
+        private static readonly byte[] ZLibMagic = { 0x78, 0x01 }; //CMF, FLG
+
+        public byte[] Decompress(Stream compressedStream, uint originalSize)
         {
             if (originalSize == 0)
                 return new byte[0];
@@ -28,26 +22,28 @@ namespace BSAsharp
             }
         }
 
-        public static Stream DecompressStream(Stream compressedStream, uint originalSize)
+        public virtual Stream DecompressStream(Stream compressedStream, uint originalSize)
         {
             if (originalSize == 0)
                 throw new ArgumentException("originalSize cannot be 0");
 
-            if (originalSize == 4)
-                //Skip zlib descriptors and ignore header for this file
-                compressedStream.Seek(2, SeekOrigin.Begin);
+            //if (originalSize == 4)
+            //    //Skip zlib descriptors and ignore header for this file
+            //    compressedStream.Seek(2, SeekOrigin.Begin);
 
-            return MakeZlibInflateStream(compressedStream, originalSize == 4);
+            return MakeZlibInflateStream(compressedStream, true);
         }
 
-        private static Stream MakeZlibInflateStream(Stream inStream, bool skipHeader)
+        protected virtual Stream MakeZlibInflateStream(Stream inStream, bool skipHeader)
         {
-#if SHARPZIPLIB
-           return new InflaterInputStream(inStream, new Inflater(skipHeader));
-#endif
+            if (skipHeader)
+            {
+                inStream.Seek(ZLibMagic.Length, SeekOrigin.Begin);
+            }
+            return new DeflateStream(inStream, CompressionMode.Decompress);
         }
 
-        public static byte[] Compress(Stream decompressedStream, int level = 6)
+        public byte[] Compress(Stream decompressedStream, CompressionLevel level = CompressionLevel.Optimal)
         {
             using (var msCompressed = new MemoryStream())
             {
@@ -60,18 +56,17 @@ namespace BSAsharp
             }
         }
 
-        public static Stream CompressStream(Stream msCompressed, int level = 6)
+        public virtual Stream CompressStream(Stream msCompressed, CompressionLevel level)
         {
+            msCompressed.Write(ZLibMagic, 0, ZLibMagic.Length);
             return MakeZlibDeflateStream(msCompressed, level);
         }
 
-        private static Stream MakeZlibDeflateStream(Stream outStream, int level)
+        protected virtual Stream MakeZlibDeflateStream(Stream outStream, CompressionLevel level)
         {
             //you can substitute any zlib-compatible deflater here
             //gzip, zopfli, etc
-#if SHARPZIPLIB
-            return new DeflaterOutputStream(outStream, new Deflater(level));
-#endif
+            return new DeflateStream(outStream, level);
         }
     }
 }

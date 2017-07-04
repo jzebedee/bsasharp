@@ -19,7 +19,16 @@ namespace BSAsharp
         public string Filename { get; private set; }
         public string Path { get; private set; }
 
-        public bool ShouldCompress { get; private set; }
+        /// <summary>
+        /// <para>This flag controls whether the file will be compressed, depending on the setting of the archive's DefaultCompress flag.</para>
+        /// <list>
+        ///     <item>When true and DefaultCompress is true: file = NOT COMPRESSED,</item>
+        ///     <item>When true and DefaultCompress is false: file = COMPRESSED,</item>
+        ///     <item>When false and DefaultCompress is true: file = COMPRESSED,</item>
+        ///     <item>When false and DefaultCompress is false: file = NOT COMPRESSED,</item>
+        /// </list>
+        /// </summary>
+        public bool IsCompressFlagSet { get; set; }
         public byte[] Data { get; }
 
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
@@ -37,8 +46,8 @@ namespace BSAsharp
             }
 
             var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
-            var hasCompressFlag = (record.size & FlagCompress) != 0;
-            var isCompressed = defaultCompressed ? !hasCompressFlag : hasCompressFlag;
+            IsCompressFlagSet = (record.size & FlagCompress) != 0;
+            var isCompressed = defaultCompressed ? !IsCompressFlagSet : IsCompressFlagSet;
             if (isCompressed)
             {
                 var originalSize = reader.ReadUInt32();

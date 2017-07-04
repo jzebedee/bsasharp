@@ -54,7 +54,9 @@ namespace bsasharp
             var namedDirectories = header.ArchiveFlags.HasFlag(ArchiveFlags.NamedDirectories);
             var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
 
-            //var folderRecordOffsets = new Dictionary<BsaFolder, uint>();
+            var folderRecordOffsets = _bsa
+                .Select((folder, i) => new { folder, folderOffset = header.Offset + (FolderRecord.Size * i) })
+                .ToDictionary(a => a.folder, a => a.folderOffset);
             var folderFileBlockOffsets = new Dictionary<BsaFolder, uint>();
 
             var fileRecordOffsets = new Dictionary<BethesdaFile, uint>();
@@ -89,6 +91,15 @@ namespace bsasharp
                 }
 
                 allFileNames.ForEach(writer.WriteCString);
+            }
+
+            var folders = folderRecordOffsets.Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
+            using (var acc = mmf.CreateViewAccessor())
+            {
+                foreach(var folder in folders)
+                {
+                    acc.Write(folder.folderRecordOffset, folder.offsetValue);
+                }
             }
 
             //_fileRecordOffsetsB

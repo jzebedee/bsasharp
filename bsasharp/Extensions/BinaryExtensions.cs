@@ -70,15 +70,5 @@ namespace BSAsharp.Extensions
 
             return str;
         }
-
-        internal static Stream ToStream(this MemoryMappedFile mmf, long offset, long size, MemoryMappedFileAccess rights)
-        {
-            return mmf.CreateViewStream(offset, size, rights);
-        }
-
-        internal static BinaryReader ToReader(this MemoryMappedFile mmf, long offset, long size)
-        {
-            return new BinaryReader(ToStream(mmf, offset, size, MemoryMappedFileAccess.Read));
-        }
     }
 }

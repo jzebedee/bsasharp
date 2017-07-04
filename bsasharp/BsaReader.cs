@@ -62,15 +62,13 @@ namespace BSAsharp
         protected IEnumerable<BsaFolder> BuildBsaLayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
         {
             var pathedFiles = folderDict
-                .SelectMany(kvp =>
-                    kvp.Value.Select(record => new { path = kvp.Key, record }))
-                .Zip(fileNames, (a, fn) => new { a.path, fn, a.record });
+                .SelectMany(kvp => kvp.Value.Select(record => new { path = kvp.Key, record }))
+                .Zip(fileNames, (a, filename) => new { a.path, filename, a.record });
 
-            var fileLookup = pathedFiles.ToLookup(a => a.path, a => new { a.fn, a.record });
+            var fileLookup = pathedFiles.ToLookup(a => a.path, a => new { a.filename, a.record });
             return
                 from g in fileLookup
-                let bsaFiles =
-                    g.Select(a => new BethesdaFile(g.Key, a.fn))
+                let bsaFiles = g.Select(a => new BethesdaFile(g.Key, a.filename, a.record, _mmf.CreateViewStream(a.record.offset, a.record.size, MemoryMappedFileAccess.Read), Header.ArchiveFlags))
                 select new BsaFolder(g.Key, bsaFiles);
         }
 

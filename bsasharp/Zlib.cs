@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.IO.Compression;
 
 namespace BSAsharp
@@ -8,29 +7,18 @@ namespace BSAsharp
     {
         private static readonly byte[] ZLibMagic = { 0x78, 0x01 }; //CMF, FLG
 
-        public byte[] Decompress(Stream compressedStream, uint originalSize)
+        public byte[] Decompress(Stream compressedStream)
         {
-            if (originalSize == 0)
-                return new byte[0];
-
-            using (var msDecompressed = new MemoryStream((int)originalSize))
+            using (var msDecompressed = new MemoryStream())
+            using (var infStream = DecompressStream(compressedStream))
             {
-                using (var infStream = DecompressStream(compressedStream, originalSize))
-                    infStream.CopyTo(msDecompressed);
-
+                infStream.CopyTo(msDecompressed);
                 return msDecompressed.ToArray();
             }
         }
 
-        public virtual Stream DecompressStream(Stream compressedStream, uint originalSize)
+        public virtual Stream DecompressStream(Stream compressedStream)
         {
-            if (originalSize == 0)
-                throw new ArgumentException("originalSize cannot be 0");
-
-            //if (originalSize == 4)
-            //    //Skip zlib descriptors and ignore header for this file
-            //    compressedStream.Seek(2, SeekOrigin.Begin);
-
             return MakeZlibInflateStream(compressedStream, true);
         }
 
@@ -38,7 +26,7 @@ namespace BSAsharp
         {
             if (skipHeader)
             {
-                inStream.Seek(ZLibMagic.Length, SeekOrigin.Begin);
+                inStream.Seek(ZLibMagic.Length, SeekOrigin.Current);
             }
             return new DeflateStream(inStream, CompressionMode.Decompress);
         }
@@ -46,12 +34,9 @@ namespace BSAsharp
         public byte[] Compress(Stream decompressedStream, CompressionLevel level = CompressionLevel.Optimal)
         {
             using (var msCompressed = new MemoryStream())
+            using (var defStream = MakeZlibDeflateStream(msCompressed, level))
             {
-                using (var defStream = MakeZlibDeflateStream(msCompressed, level))
-                {
-                    decompressedStream.CopyTo(defStream);
-                }
-
+                decompressedStream.CopyTo(defStream);
                 return msCompressed.ToArray();
             }
         }

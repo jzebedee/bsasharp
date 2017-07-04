@@ -3,6 +3,7 @@ using System.IO;
 using System.Diagnostics;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
+using System.IO.MemoryMappedFiles;
 
 namespace BSAsharp
 {
@@ -20,15 +21,42 @@ namespace BSAsharp
 
         public bool ShouldCompress { get; private set; }
         public byte[] Data { get; }
-        
+
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
         public ulong Hash { get; }
 
-        internal BethesdaFile(string path, string name, FileRecord record, ArchiveFlags flags) : this(path, name)
+        internal BethesdaFile(string path, string name, FileRecord record, MemoryMappedViewStream dataStream, ArchiveFlags flags) : this(path, name)
         {
-            Debug.Assert(record.hash == Hash);
-            var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
+            var reader = new BinaryReader(dataStream);
+
             var bstringPrefixed = flags.HasFlag(ArchiveFlags.BStringPrefixed);
+            if (bstringPrefixed)
+            {
+                var prefixed_name = reader.ReadBString();
+                Debug.Assert(prefixed_name == Filename);
+            }
+
+            var size = record.size;
+
+            var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
+            var hasCompressFlag = (record.size & FlagCompress) != 0;
+            var isCompressed = defaultCompressed ? !hasCompressFlag : hasCompressFlag;
+            if (isCompressed)
+            {
+                var originalSize = reader.ReadUInt32();
+                size -= sizeof(UInt32);
+
+                var zlib = new Zlib();
+                var inflatedData = zlib.Decompress(reader.BaseStream);
+                if (inflatedData.Length != originalSize)
+                    throw new InvalidOperationException("Inflated file data did not match original size");
+
+                Data = inflatedData;
+            }
+            else
+            {
+                Data = reader.ReadBytes((int)size);
+            }
         }
         public BethesdaFile(string path, string name, byte[] data) : this(path, name)
         {

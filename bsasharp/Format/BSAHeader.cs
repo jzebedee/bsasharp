@@ -2,7 +2,7 @@
 
 namespace BSAsharp.Format
 {
-    internal struct BsaHeader
+    public struct BsaHeader
     {
         internal const int Size = 0x24;
 

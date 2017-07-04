@@ -110,6 +110,7 @@ namespace bsasharp
                 var size = (uint)file.Data.Length;
                 if(defaultCompress ^ file.IsCompressFlagSet)
                 {
+                    //must use compressed size here
                     size += sizeof(uint);
                     size |= BethesdaFile.FlagCompress;
                 }
@@ -123,7 +124,7 @@ namespace bsasharp
             }
         }
 
-        private FileFlags CreateFileFlags(IEnumerable<string> allFiles)
+        public static FileFlags CreateFileFlags(IEnumerable<string> allFiles)
         {
             FileFlags flags = 0;
 

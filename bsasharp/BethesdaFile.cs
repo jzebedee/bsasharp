@@ -36,15 +36,12 @@ namespace BSAsharp
                 Debug.Assert(prefixed_name == Filename);
             }
 
-            var size = record.size;
-
             var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
             var hasCompressFlag = (record.size & FlagCompress) != 0;
             var isCompressed = defaultCompressed ? !hasCompressFlag : hasCompressFlag;
             if (isCompressed)
             {
                 var originalSize = reader.ReadUInt32();
-                size -= sizeof(UInt32);
 
                 var zlib = new Zlib();
                 var inflatedData = zlib.Decompress(reader.BaseStream);
@@ -55,7 +52,7 @@ namespace BSAsharp
             }
             else
             {
-                Data = reader.ReadBytes((int)size);
+                Data = reader.ReadBytes((int)record.size);
             }
         }
         public BethesdaFile(string path, string name, byte[] data) : this(path, name)

@@ -31,27 +31,27 @@ namespace BSAsharp
             return new DeflateStream(inStream, CompressionMode.Decompress);
         }
 
-        public byte[] Compress(Stream decompressedStream, CompressionLevel level = CompressionLevel.Optimal)
+        public byte[] Compress(Stream decompressedStream, CompressionLevel level = CompressionLevel.Optimal, bool leaveOpen = true)
         {
             using (var msCompressed = new MemoryStream())
-            using (var defStream = MakeZlibDeflateStream(msCompressed, level))
+            using (var defStream = MakeZlibDeflateStream(msCompressed, level, leaveOpen))
             {
                 decompressedStream.CopyTo(defStream);
                 return msCompressed.ToArray();
             }
         }
 
-        public virtual Stream CompressStream(Stream msCompressed, CompressionLevel level)
+        public virtual Stream CompressStream(Stream msCompressed, CompressionLevel level, bool leaveOpen = true)
         {
             msCompressed.Write(ZLibMagic, 0, ZLibMagic.Length);
-            return MakeZlibDeflateStream(msCompressed, level);
+            return MakeZlibDeflateStream(msCompressed, level, leaveOpen);
         }
 
-        protected virtual Stream MakeZlibDeflateStream(Stream outStream, CompressionLevel level)
+        protected virtual Stream MakeZlibDeflateStream(Stream outStream, CompressionLevel level, bool leaveOpen)
         {
             //you can substitute any zlib-compatible deflater here
             //gzip, zopfli, etc
-            return new DeflateStream(outStream, level);
+            return new DeflateStream(outStream, level, leaveOpen);
         }
     }
 }

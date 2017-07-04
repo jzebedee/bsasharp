@@ -14,7 +14,7 @@ namespace BSAsharp
     /// A managed representation of a BSA folder.
     /// </summary>
     [DebuggerDisplay("{Path} ({Count})")]
-    public class BsaFolder : SortedSet<BsaFile>, IBsaEntry
+    public class BsaFolder : SortedSet<BethesdaFile>, IBsaEntry
     {
         public string Path { get; private set; }
 
@@ -32,7 +32,7 @@ namespace BSAsharp
             }
         }
 
-        public BsaFolder(string path, IEnumerable<BsaFile> children = null)
+        public BsaFolder(string path, IEnumerable<BethesdaFile> children = null)
             : this(children)
         {
             if (string.IsNullOrEmpty(path))
@@ -42,8 +42,8 @@ namespace BSAsharp
             Path = Util.FixPath(path);
             Hash = Util.CreateHash(Path);
         }
-        private BsaFolder(IEnumerable<BsaFile> collection)
-            : base(collection ?? new SortedSet<BsaFile>(), BsaHashComparer.Instance)
+        private BsaFolder(IEnumerable<BethesdaFile> collection)
+            : base(collection ?? new SortedSet<BethesdaFile>(), BsaHashComparer.Instance)
         {
         }
 
@@ -59,7 +59,7 @@ namespace BSAsharp
                 var outFilepath = System.IO.Path.Combine(outFolder, file.Filename);
                 using (Stream
                     outFilestream = File.OpenWrite(outFilepath),
-                    bsaFilestream = file.GetContentStream(true))
+                    bsaFilestream = new MemoryStream(file.Data))
                     bsaFilestream.CopyTo(outFilestream);
             }
         }
@@ -85,7 +85,7 @@ namespace BSAsharp
                 var outFilepath = System.IO.Path.Combine(outFolder, file.Filename);
                 using (Stream
                     outFilestream = File.OpenWrite(outFilepath),
-                    bsaFilestream = file.GetContentStream(true))
+                    bsaFilestream = new MemoryStream(file.Data))
                 {
                     await bsaFilestream.CopyToAsync(outFilestream, 0x1000/*default*/, setToken);
                     if (progress != null)

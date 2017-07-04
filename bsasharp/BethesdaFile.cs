@@ -24,6 +24,12 @@ namespace BSAsharp
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
         public ulong Hash { get; }
 
+        internal BethesdaFile(string path, string name, FileRecord record, ArchiveFlags flags) : this(path, name)
+        {
+            Debug.Assert(record.hash == Hash);
+            var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
+            var bstringPrefixed = flags.HasFlag(ArchiveFlags.BStringPrefixed);
+        }
         public BethesdaFile(string path, string name, byte[] data) : this(path, name)
         {
             Data = data;

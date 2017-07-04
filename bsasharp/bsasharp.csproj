@@ -9,12 +9,4 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Compile Remove="BsaFile.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="BsaFile.cs" />
-  </ItemGroup>
-
 </Project>

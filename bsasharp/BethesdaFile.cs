@@ -13,7 +13,7 @@ namespace BSAsharp
     [DebuggerDisplay("{Filename}")]
     public class BethesdaFile : IBsaEntry
     {
-        const uint FlagCompress = 1 << 30;
+        internal const uint FlagCompress = 1 << 30;
 
         public string Name { get; private set; }
         public string Filename { get; private set; }

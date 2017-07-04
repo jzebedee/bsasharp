@@ -46,12 +46,12 @@ namespace bsasharp
                 foreach (var folder in bsa)
                     WriteFolderRecord(writer, folder);
 
+                var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
                 foreach (var folder in bsa)
-                    WriteFileRecordBlock(writer, folder, header.TotalFileNameLength);
+                    WriteFileRecordBlock(writer, folder, defaultCompress, header.TotalFileNameLength);
 
                 allFileNames.ForEach(writer.WriteCString);
 
-                var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
                 var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
                 allFiles.ForEach(file => WriteFileBlock(writer, file, defaultCompress, bstringPrefixed)); 
 
@@ -98,7 +98,7 @@ namespace bsasharp
             folder.Record.Write(writer);
         }
 
-        private void WriteFileRecordBlock(BinaryWriter writer, BsaFolder folder, uint totalFileNameLength)
+        private void WriteFileRecordBlock(BinaryWriter writer, BsaFolder folder, bool defaultCompress, uint totalFileNameLength)
         {
             _folderRecordOffsetsB.Add(folder, (uint)writer.BaseStream.Position + totalFileNameLength);
             writer.WriteBZString(folder.Path);
@@ -106,10 +106,18 @@ namespace bsasharp
             foreach (var file in folder)
             {
                 _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + Bsa.SizeRecordOffset);
+
+                var size = (uint)file.Data.Length;
+                if(defaultCompress ^ file.IsCompressFlagSet)
+                {
+                    size += sizeof(uint);
+                    size |= BethesdaFile.FlagCompress;
+                }
+
                 var fileRecord = new FileRecord
                 {
                     hash = file.Hash,
-                    size = (uint)file.Data.Length
+                    size = size
                 };
                 fileRecord.Write(writer);
             }

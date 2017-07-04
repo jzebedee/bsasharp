@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BSAsharp.Extensions;
 using BSAsharp.Progress;
+using BSAsharp.Format;
 
 namespace BSAsharp
 {
@@ -18,6 +19,8 @@ namespace BSAsharp
         internal const uint BsaMaxSize = 0x80000000; //2 GiB
 
         private readonly BsaReader _bsaReader;
+
+        public BsaHeader Header => _bsaReader.Header;
 
         /// <summary>
         /// Creates a new BSAWrapper instance around an existing BSA file

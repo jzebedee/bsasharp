@@ -5,4 +5,12 @@
     <Authors>J. Zebedee</Authors>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="BsaFile.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="BsaFile.cs" />
+  </ItemGroup>
+
 </Project>

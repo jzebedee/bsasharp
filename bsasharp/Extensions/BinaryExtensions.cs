@@ -8,8 +8,6 @@ namespace BSAsharp.Extensions
 {
     public static class BinaryExtensions
     {
-        public static readonly Encoding Windows1252 = Encoding.GetEncoding("Windows-1252");
-
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();
@@ -19,14 +17,14 @@ namespace BSAsharp.Extensions
         public static string ReadBString(this BinaryReader reader, byte length, bool stripEnd = false)
         {
             var bytes = reader.ReadBytes(length);
-            var bstring = Windows1252.GetString(bytes);
+            var bstring = Encoding.Default.GetString(bytes);
 
             return stripEnd ? bstring.TrimEnd('\0') : bstring;
         }
 
         public static void WriteBString(this BinaryWriter writer, string toWrite)
         {
-            var bytes = Windows1252.GetBytes(toWrite);
+            var bytes = Encoding.Default.GetBytes(toWrite);
 
             writer.Write((byte)bytes.Length);
             writer.Write(bytes);
@@ -49,7 +47,7 @@ namespace BSAsharp.Extensions
 
         public static void WriteCString(this BinaryWriter writer, string toWrite)
         {
-            var bytes = Windows1252.GetBytes(toWrite + "\0");
+            var bytes = Encoding.Default.GetBytes(toWrite + "\0");
             writer.Write(bytes);
         }
 

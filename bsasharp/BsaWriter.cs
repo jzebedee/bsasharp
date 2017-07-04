@@ -51,7 +51,9 @@ namespace bsasharp
 
                 allFileNames.ForEach(writer.WriteCString);
 
-                allFiles.ForEach(file => WriteFileBlock(writer, file));
+                var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
+                var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+                allFiles.ForEach(file => WriteFileBlock(writer, file, defaultCompress, bstringPrefixed)); 
 
                 var folderRecordOffsets = _folderRecordOffsetsA.Zip(_folderRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
                 var fileRecordOffsets = _fileRecordOffsetsA.Zip(_fileRecordOffsetsB, (kvpA, kvpB) => new KeyValuePair<uint, uint>(kvpA.Value, kvpB.Value));
@@ -65,23 +67,34 @@ namespace bsasharp
             }
         }
 
-        private void WriteFileBlock(BinaryWriter writer, BethesdaFile file)
+        private void WriteFileBlock(BinaryWriter writer, BethesdaFile file, bool defaultCompress, bool bstringPrefixed)
         {
             _fileRecordOffsetsB.Add(file, (uint)writer.BaseStream.Position);
-            if (BStringPrefixed)
+            if (bstringPrefixed)
             {
                 writer.WriteBString(file.Filename);
             }
-            if (file.ShouldCompress)
+            if (file.IsCompressFlagSet ^ defaultCompress)
             {
-                throw new InvalidOperationException();
+                //write compressed
+                writer.Write((uint)file.Data.Length + 4);
+                var zlib = new Zlib();
+                using (var dataStream = new MemoryStream(file.Data))
+                using (var deflateStream = zlib.CompressStream(writer.BaseStream, System.IO.Compression.CompressionLevel.Optimal))
+                {
+                    dataStream.CopyTo(deflateStream);
+                }
             }
-            writer.Write(file.Data);
+            else
+            {
+                //write normal
+                writer.Write(file.Data);
+            }
         }
 
         private void WriteFolderRecord(BinaryWriter writer, BsaFolder folder)
         {
-            _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + SizeRecordOffset);
+            _folderRecordOffsetsA.Add(folder, (uint)writer.BaseStream.Position + Bsa.SizeRecordOffset);
             folder.Record.Write(writer);
         }
 
@@ -92,7 +105,7 @@ namespace bsasharp
 
             foreach (var file in folder)
             {
-                _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + SizeRecordOffset);
+                _fileRecordOffsetsA.Add(file, (uint)writer.BaseStream.Position + Bsa.SizeRecordOffset);
                 var fileRecord = new FileRecord
                 {
                     hash = file.Hash,

@@ -94,8 +94,8 @@ namespace bsasharp
                 offset = writer.BaseStream.Position;
             }
 
-            var folders = folderRecordOffsets.OrderBy(a => a.Key.Hash)
-                .Zip(folderFileBlockOffsets.OrderBy(a => a.Key.Hash), (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
+            var folders = folderRecordOffsets
+                .Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
             using (var acc = mmf.CreateViewAccessor())
             {
                 foreach (var folder in folders)
@@ -149,40 +149,31 @@ namespace bsasharp
                 }
             }
 
-            var files = fileRecordOffsets.OrderBy(a => a.Key.Hash)
-                .Zip(fileDataOffsets.OrderBy(a => a.Key.Hash), (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
-                .Zip(fileDataSizes.OrderBy(a => a.Key.Hash), (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
+            var files = fileRecordOffsets
+                .Zip(fileDataOffsets, (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
+                .Zip(fileDataSizes, (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
             using (var acc = mmf.CreateViewAccessor())
             {
-                foreach (var file in files)
+                unsafe
                 {
-                    unsafe
+                    try
                     {
-                        try
-                        {
-                            byte* ptr = (byte*)0;
-                            acc.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+                        byte* ptr = (byte*)0;
+                        acc.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
 
+                        foreach (var file in files)
+                        {
                             var fileRecord = (FileRecord*)(ptr + file.fileRecordOffset);
                             fileRecord->size = file.size;
                             fileRecord->offset = file.offsetValue;
-
-                            byte[] data = new byte[(file.size & ~BethesdaFile.FlagCompress) - sizeof(uint)]; 
-                            var originalSize = acc.ReadUInt32(file.offsetValue);
-                            System.Diagnostics.Debug.Assert(acc.ReadArray<byte>(file.offsetValue + sizeof(uint), data, 0, data.Length) == data.Length);
-
-                            var zlib = new Zlib();
-                            var inflatedData = zlib.Decompress(new MemoryStream(data));
-                            System.Diagnostics.Debug.Assert(inflatedData.Length == originalSize);
                         }
-                        finally
-                        {
-                            acc.SafeMemoryMappedViewHandle.ReleasePointer();
-                        }
+                    }
+                    finally
+                    {
+                        acc.SafeMemoryMappedViewHandle.ReleasePointer();
                     }
                 }
             }
-
         }
 
         public void Save(Stream stream, BsaHeader header)

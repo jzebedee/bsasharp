@@ -23,10 +23,15 @@ namespace bsasharp
         {
             using (var mmf = MemoryMappedFile.CreateFromFile(path, FileMode.Create, null, Bsa.BsaMaxSize, MemoryMappedFileAccess.ReadWrite))
             {
+#if UNSAFE
                 SaveUnsafe(mmf, header);
+#else
+                Save(mmf.CreateViewStream(), header);
+#endif
             }
         }
 
+#if UNSAFE
         public void SaveUnsafe(MemoryMappedFile mmf, BsaHeader header)
         {
             var allFiles = _bsa.SelectMany(fold => fold).ToList();
@@ -175,6 +180,7 @@ namespace bsasharp
                 }
             }
         }
+#endif
 
         public void Save(Stream stream, BsaHeader header)
         {

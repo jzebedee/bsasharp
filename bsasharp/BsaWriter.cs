@@ -94,7 +94,8 @@ namespace bsasharp
                 offset = writer.BaseStream.Position;
             }
 
-            var folders = folderRecordOffsets.Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
+            var folders = folderRecordOffsets.OrderBy(a => a.Key.Hash)
+                .Zip(folderFileBlockOffsets.OrderBy(a => a.Key.Hash), (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
             using (var acc = mmf.CreateViewAccessor())
             {
                 foreach (var folder in folders)
@@ -105,7 +106,8 @@ namespace bsasharp
 
             var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
             using (var stream = mmf.CreateViewStream())
-            using (var writer = new BinaryWriter(stream)) {
+            using (var writer = new BinaryWriter(stream))
+            {
                 writer.BaseStream.Seek(offset, SeekOrigin.Begin);
                 foreach (var file in allFiles)
                 {
@@ -128,9 +130,8 @@ namespace bsasharp
                         using (var deflateStream = zlib.CompressStream(writer.BaseStream, System.IO.Compression.CompressionLevel.Optimal))
                         {
                             dataStream.CopyTo(deflateStream);
-                            //set size = compressed size + sizeof(originalSize field)
-                            size = (uint)(writer.BaseStream.Position - beginOffset);
                         }
+                        size = (uint)(writer.BaseStream.Position - beginOffset);
                     }
                     else
                     {
@@ -139,7 +140,7 @@ namespace bsasharp
                         size = (uint)file.Data.Length;
                     }
 
-                    if(file.IsCompressFlagSet)
+                    if (file.IsCompressFlagSet)
                     {
                         size |= BethesdaFile.FlagCompress;
                     }
@@ -148,15 +149,37 @@ namespace bsasharp
                 }
             }
 
-            var files = fileRecordOffsets
-                .Zip(fileDataOffsets, (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
-                .Zip(fileDataSizes, (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
+            var files = fileRecordOffsets.OrderBy(a => a.Key.Hash)
+                .Zip(fileDataOffsets.OrderBy(a => a.Key.Hash), (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
+                .Zip(fileDataSizes.OrderBy(a => a.Key.Hash), (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
             using (var acc = mmf.CreateViewAccessor())
             {
                 foreach (var file in files)
                 {
-                    acc.Write(file.fileRecordOffset + sizeof(ulong), file.size);
-                    acc.Write(file.fileRecordOffset + Bsa.SizeRecordOffset, file.offsetValue);
+                    unsafe
+                    {
+                        try
+                        {
+                            byte* ptr = (byte*)0;
+                            acc.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+
+                            var fileRecord = (FileRecord*)(ptr + file.fileRecordOffset);
+                            fileRecord->size = file.size;
+                            fileRecord->offset = file.offsetValue;
+
+                            byte[] data = new byte[(file.size & ~BethesdaFile.FlagCompress) - sizeof(uint)]; 
+                            var originalSize = acc.ReadUInt32(file.offsetValue);
+                            System.Diagnostics.Debug.Assert(acc.ReadArray<byte>(file.offsetValue + sizeof(uint), data, 0, data.Length) == data.Length);
+
+                            var zlib = new Zlib();
+                            var inflatedData = zlib.Decompress(new MemoryStream(data));
+                            System.Diagnostics.Debug.Assert(inflatedData.Length == originalSize);
+                        }
+                        finally
+                        {
+                            acc.SafeMemoryMappedViewHandle.ReleasePointer();
+                        }
+                    }
                 }
             }
 

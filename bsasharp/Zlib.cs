@@ -31,15 +31,15 @@ namespace BSAsharp
             return new DeflateStream(inStream, CompressionMode.Decompress);
         }
 
-        public byte[] Compress(Stream decompressedStream, CompressionLevel level = CompressionLevel.Optimal, bool leaveOpen = true)
-        {
-            using (var msCompressed = new MemoryStream())
-            using (var defStream = MakeZlibDeflateStream(msCompressed, level, leaveOpen))
-            {
-                decompressedStream.CopyTo(defStream);
-                return msCompressed.ToArray();
-            }
-        }
+        //public byte[] Compress(Stream inputStream, CompressionLevel level = CompressionLevel.Optimal, bool leaveOpen = true)
+        //{
+        //    using (var msCompressed = new MemoryStream())
+        //    using (var defStream = MakeZlibDeflateStream(msCompressed, level, leaveOpen))
+        //    {
+        //        inputStream.CopyTo(defStream);
+        //        return msCompressed.ToArray();
+        //    }
+        //}
 
         public virtual Stream CompressStream(Stream msCompressed, CompressionLevel level, bool leaveOpen = true)
         {

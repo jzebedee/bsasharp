@@ -22,14 +22,17 @@ namespace bsasharp
 
         public void Save(string path, BsaHeader header)
         {
+#if UNSAFE
             using (var mmf = MemoryMappedFile.CreateFromFile(path, FileMode.Create, null, Bsa.BsaMaxSize, MemoryMappedFileAccess.ReadWrite))
             {
-#if UNSAFE
                 SaveUnsafe(mmf, header);
-#else
-                Save(mmf, header);
-#endif
             }
+#else
+            using (var stream = File.Create(path))
+            {
+                Save(stream, header);
+            }
+#endif
         }
 
 #if UNSAFE
@@ -182,7 +185,7 @@ namespace bsasharp
             }
         }
 #else
-        private void Save(MemoryMappedFile mmf, BsaHeader header)
+        private void Save(Stream stream, BsaHeader header)
         {
             var allFiles = _bsa.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
@@ -195,36 +198,33 @@ namespace bsasharp
             header.TotalFolderNameLength = (uint)_bsa.Sum(folder => folder.Path.Length + 1);
             header.TotalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
 
-            long offset = 0;
-            using (var acc = mmf.CreateViewAccessor())
-            {
-                acc.Write(offset, ref header);
-                offset += header.Offset;
-
-                var folderRecords = _bsa.Select(folder => folder.Record).ToArray();
-                acc.WriteArray(offset, folderRecords, 0, folderRecords.Length);
-                offset += Marshal.SizeOf(typeof(FolderRecord)) * folderRecords.Length;
-            }
-
-            var namedDirectories = header.ArchiveFlags.HasFlag(ArchiveFlags.NamedDirectories);
-            var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
-
-            var folderRecordOffsets = _bsa
-                .Select((folder, i) => new { folder, folderOffset = header.Offset + (Marshal.SizeOf(typeof(FolderRecord)) * i) })
-                .ToDictionary(a => a.folder, a => a.folderOffset);
-            var folderFileBlockOffsets = new Dictionary<BsaFolder, uint>();
-            var fileRecordOffsets = new Dictionary<BethesdaFile, uint>();
-            var fileDataSizes = new Dictionary<BethesdaFile, uint>();
-            var fileDataOffsets = new Dictionary<BethesdaFile, uint>();
-
-            using (var stream = mmf.CreateViewStream())
+            var headerBytes = BinaryExtensions.GetBytes(header);
             using (var writer = new BinaryWriter(stream))
             {
-                writer.BaseStream.Seek(offset, SeekOrigin.Begin);
+                writer.Write(headerBytes);
+
+                foreach (var record in _bsa.Select(folder => folder.Record))
+                {
+                    var folderRecordBytes = BinaryExtensions.GetBytes(record);
+                    writer.Write(folderRecordBytes);
+                }
+
+                var namedDirectories = header.ArchiveFlags.HasFlag(ArchiveFlags.NamedDirectories);
+                var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
+
+                var folderRecordOffsets = _bsa
+                    .Select((folder, i) => new { folder, folderOffset = header.Offset + (Marshal.SizeOf(typeof(FolderRecord)) * i) })
+                    .ToDictionary(a => a.folder, a => a.folderOffset);
+                var folderFileBlockOffsets = new Dictionary<BsaFolder, uint>();
+                var fileRecordOffsets = new Dictionary<BethesdaFile, uint>();
+                var fileDataSizes = new Dictionary<BethesdaFile, uint>();
+                var fileDataOffsets = new Dictionary<BethesdaFile, uint>();
+
+                var offset = (uint)writer.BaseStream.Position;
                 foreach (var folder in _bsa)
                 {
                     var folderFilesOffset = offset + header.TotalFileNameLength;
-                    folderFileBlockOffsets.Add(folder, (uint)folderFilesOffset);
+                    folderFileBlockOffsets.Add(folder, folderFilesOffset);
 
                     if (namedDirectories)
                     {
@@ -244,27 +244,22 @@ namespace bsasharp
                         writer.Seek(sizeof(uint), SeekOrigin.Current);
                     }
 
-                    offset = writer.BaseStream.Position;
+                    offset = (uint)writer.BaseStream.Position;
                 }
 
                 allFileNames.ForEach(writer.WriteCString);
-                offset = writer.BaseStream.Position;
-            }
+                offset = (uint)writer.BaseStream.Position;
 
-            var folders = folderRecordOffsets
-                .Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
-            using (var acc = mmf.CreateViewAccessor())
-            {
+                var folders = folderRecordOffsets
+                    .Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
                 foreach (var folder in folders)
                 {
-                    acc.Write(folder.folderRecordOffset, folder.offsetValue);
+                    writer.BaseStream.Seek(folder.folderRecordOffset, SeekOrigin.Begin);
+                    writer.Write(folder.offsetValue);
                 }
-            }
 
-            var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-            using (var stream = mmf.CreateViewStream())
-            using (var writer = new BinaryWriter(stream))
-            {
+                var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+
                 writer.BaseStream.Seek(offset, SeekOrigin.Begin);
                 foreach (var file in allFiles)
                 {
@@ -304,17 +299,15 @@ namespace bsasharp
 
                     fileDataSizes.Add(file, size);
                 }
-            }
 
-            var files = fileRecordOffsets
-                .Zip(fileDataOffsets, (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
-                .Zip(fileDataSizes, (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
-            using (var acc = mmf.CreateViewAccessor())
-            {
+                var files = fileRecordOffsets
+                    .Zip(fileDataOffsets, (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
+                    .Zip(fileDataSizes, (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
                 foreach (var file in files)
                 {
-                    acc.Write(file.fileRecordOffset + sizeof(ulong), file.size);
-                    acc.Write(file.fileRecordOffset + Bsa.SizeRecordOffset, file.offsetValue);
+                    writer.BaseStream.Seek(file.fileRecordOffset + sizeof(ulong), SeekOrigin.Begin);
+                    writer.Write(file.size);
+                    writer.Write(file.offsetValue);
                 }
             }
         }

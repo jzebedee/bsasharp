@@ -203,9 +203,15 @@ namespace bsasharp
             {
                 writer.Write(headerBytes);
 
-                foreach (var record in _bsa.Select(folder => folder.Record))
+                foreach (var folder in _bsa)
                 {
-                    var folderRecordBytes = BinaryExtensions.GetBytes(record);
+                    var folderRecord = new FolderRecord
+                    {
+                        hash = folder.Hash,
+                        count = (uint)folder.Count
+                    };
+
+                    var folderRecordBytes = BinaryExtensions.GetBytes(folderRecord);
                     writer.Write(folderRecordBytes);
                 }
 

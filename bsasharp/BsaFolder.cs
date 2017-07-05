@@ -20,18 +20,6 @@ namespace BSAsharp
 
         public ulong Hash { get; private set; }
 
-        internal FolderRecord Record
-        {
-            get
-            {
-                return new FolderRecord
-                {
-                    hash = Hash,
-                    count = (uint)Count,
-                };
-            }
-        }
-
         public BsaFolder(string path, IEnumerable<BethesdaFile> children = null)
             : this(children)
         {

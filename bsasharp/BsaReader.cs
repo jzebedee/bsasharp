@@ -4,6 +4,7 @@ using System.IO.MemoryMappedFiles;
 using System.Linq;
 using BSAsharp.Format;
 using System.Text;
+using System.Runtime.InteropServices;
 
 namespace BSAsharp
 {
@@ -43,7 +44,7 @@ namespace BSAsharp
 
         public IEnumerable<BsaFolder> Read()
         {
-            using(var headerStream = _mmf.CreateViewAccessor(0, BsaHeader.Size, MemoryMappedFileAccess.Read))
+            using(var headerStream = _mmf.CreateViewAccessor(0, Marshal.SizeOf(typeof(BsaHeader)), MemoryMappedFileAccess.Read))
                 headerStream.Read(0, out _header);
 
             if (Header.Version != Bsa.FalloutVersion)
@@ -92,7 +93,7 @@ namespace BSAsharp
         protected FolderRecord[] ReadFolderRecords(ref long offset, uint folderCount)
         {
             var folders = new FolderRecord[folderCount];
-            var folderRecordsSize = folderCount * FolderRecord.Size;
+            var folderRecordsSize = folderCount * Marshal.SizeOf(typeof(FolderRecord));
 
             using (var folderRecordView = _mmf.CreateViewAccessor(offset, folderRecordsSize, MemoryMappedFileAccess.Read))
             {
@@ -108,7 +109,7 @@ namespace BSAsharp
         protected FileRecord[] ReadFileRecords(ref long offset, uint fileCount)
         {
             var files = new FileRecord[fileCount];
-            var fileRecordsSize = fileCount * FileRecord.Size;
+            var fileRecordsSize = fileCount * Marshal.SizeOf(typeof(FileRecord));
 
             using (var fileRecordView = _mmf.CreateViewAccessor(offset, fileRecordsSize, MemoryMappedFileAccess.Read))
             {

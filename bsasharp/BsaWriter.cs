@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace bsasharp
@@ -26,7 +27,7 @@ namespace bsasharp
 #if UNSAFE
                 SaveUnsafe(mmf, header);
 #else
-                Save(mmf.CreateViewStream(), header);
+                Save(mmf, header);
 #endif
             }
         }
@@ -53,14 +54,14 @@ namespace bsasharp
 
                 var folderRecords = _bsa.Select(folder => folder.Record).ToArray();
                 acc.WriteArray(offset, folderRecords, 0, folderRecords.Length);
-                offset += FolderRecord.Size * folderRecords.Length;
+                offset += Marshal.SizeOf(typeof(FolderRecord)) * folderRecords.Length;
             }
 
             var namedDirectories = header.ArchiveFlags.HasFlag(ArchiveFlags.NamedDirectories);
             var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
 
             var folderRecordOffsets = _bsa
-                .Select((folder, i) => new { folder, folderOffset = header.Offset + (FolderRecord.Size * i) })
+                .Select((folder, i) => new { folder, folderOffset = header.Offset + (Marshal.SizeOf(typeof(FolderRecord)) * i) })
                 .ToDictionary(a => a.folder, a => a.folderOffset);
             var folderFileBlockOffsets = new Dictionary<BsaFolder, uint>();
 
@@ -180,128 +181,144 @@ namespace bsasharp
                 }
             }
         }
-#endif
-
-        public void Save(Stream stream, BsaHeader header)
+#else
+        private void Save(MemoryMappedFile mmf, BsaHeader header)
         {
             var allFiles = _bsa.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
             header.Field = Bsa.BsaGreet;
             header.Version = Bsa.FalloutVersion;
-            header.Offset = BsaHeader.Size;
+            header.Offset = (uint)Marshal.SizeOf(typeof(BsaHeader));
             header.FolderCount = (uint)_bsa.Count;
             header.FileCount = (uint)allFileNames.Count;
             header.TotalFolderNameLength = (uint)_bsa.Sum(folder => folder.Path.Length + 1);
             header.TotalFileNameLength = (uint)allFileNames.Sum(file => file.Length + 1);
 
+            long offset = 0;
+            using (var acc = mmf.CreateViewAccessor())
+            {
+                acc.Write(offset, ref header);
+                offset += header.Offset;
+
+                var folderRecords = _bsa.Select(folder => folder.Record).ToArray();
+                acc.WriteArray(offset, folderRecords, 0, folderRecords.Length);
+                offset += Marshal.SizeOf(typeof(FolderRecord)) * folderRecords.Length;
+            }
+
+            var namedDirectories = header.ArchiveFlags.HasFlag(ArchiveFlags.NamedDirectories);
+            var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
+
+            var folderRecordOffsets = _bsa
+                .Select((folder, i) => new { folder, folderOffset = header.Offset + (Marshal.SizeOf(typeof(FolderRecord)) * i) })
+                .ToDictionary(a => a.folder, a => a.folderOffset);
+            var folderFileBlockOffsets = new Dictionary<BsaFolder, uint>();
+            var fileRecordOffsets = new Dictionary<BethesdaFile, uint>();
+            var fileDataSizes = new Dictionary<BethesdaFile, uint>();
+            var fileDataOffsets = new Dictionary<BethesdaFile, uint>();
+
+            using (var stream = mmf.CreateViewStream())
             using (var writer = new BinaryWriter(stream))
             {
-                header.Write(writer);
+                writer.BaseStream.Seek(offset, SeekOrigin.Begin);
+                foreach (var folder in _bsa)
+                {
+                    var folderFilesOffset = offset + header.TotalFileNameLength;
+                    folderFileBlockOffsets.Add(folder, (uint)folderFilesOffset);
 
-                //write all folder records and get back FolderRecord*[]
-                var folderRecordOffsets = _bsa.Select(folder => WriteFolderRecord(writer, folder)).ToArray();
+                    if (namedDirectories)
+                    {
+                        writer.WriteBZString(folder.Path);
+                    }
 
-                var namedDirectories = header.ArchiveFlags.HasFlag(ArchiveFlags.NamedDirectories);
-                var defaultCompress = header.ArchiveFlags.HasFlag(ArchiveFlags.DefaultCompressed);
+                    foreach (var file in folder)
+                    {
+                        fileRecordOffsets.Add(file, (uint)writer.BaseStream.Position);
+                        var fileRecord = new FileRecord
+                        {
+                            hash = file.Hash
+                        };
 
-                //write all folder names and file record blocks, get back { folder, FileRecord*[] for folder, and FileRecordBlock* }
-                //FileRecordBlock* must be written back into FolderRecord*
-                var fileRecordBlocks = _bsa.Select(folder =>
-                 {
-                     var fileOffsets = WriteFileRecordBlock(writer, folder, namedDirectories, defaultCompress, header.TotalFileNameLength, out long folderFilesOffset);
-                     return new { folder, folderFilesOffset, fileOffsets };
-                 }).ToArray();
+                        writer.Write(fileRecord.hash);
+                        writer.Seek(sizeof(uint), SeekOrigin.Current);
+                        writer.Seek(sizeof(uint), SeekOrigin.Current);
+                    }
+
+                    offset = writer.BaseStream.Position;
+                }
 
                 allFileNames.ForEach(writer.WriteCString);
+                offset = writer.BaseStream.Position;
+            }
 
-                //_fileRecordOffsetsB
-                var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-                var fileDataOffsets = allFiles.Select(file => WriteFileBlock(writer, file, defaultCompress, bstringPrefixed)).ToArray();
-
-                var folderMap = folderRecordOffsets
-                   .Zip(fileRecordBlocks, (folderRecordOffset, firA) => new { firA.folder, folderRecordOffset, firA.folderFilesOffset, firA.fileOffsets });
-
-                int i = 0;
-                foreach (var a in folderMap)
+            var folders = folderRecordOffsets
+                .Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
+            using (var acc = mmf.CreateViewAccessor())
+            {
+                foreach (var folder in folders)
                 {
-                    //skip to folderRecord + [fieldOffset] for offset
-                    writer.BaseStream.Seek(a.folderRecordOffset + Bsa.SizeRecordOffset, SeekOrigin.Begin);
-                    writer.Write(a.folderFilesOffset);
+                    acc.Write(folder.folderRecordOffset, folder.offsetValue);
+                }
+            }
 
-                    foreach (var fileOffset in a.fileOffsets)
+            var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
+            using (var stream = mmf.CreateViewStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.BaseStream.Seek(offset, SeekOrigin.Begin);
+                foreach (var file in allFiles)
+                {
+                    var fileDataOffset = (uint)writer.BaseStream.Position;
+                    fileDataOffsets.Add(file, fileDataOffset);
+
+                    uint size;
+
+                    if (bstringPrefixed)
                     {
-                        //skip to fileRecord + [fieldOffset] for size
-                        writer.BaseStream.Seek(fileOffset + sizeof(ulong), SeekOrigin.Begin);
-
-                        var fileData = fileDataOffsets[i++];
-                        writer.Write(fileData.Value);
-                        writer.Write(fileData.Key);
+                        writer.WriteBString(file.Filename);
                     }
+                    if (file.IsCompressFlagSet ^ defaultCompress)
+                    {
+                        var beginOffset = (uint)writer.BaseStream.Position;
+                        //write compressed
+                        writer.Write((uint)file.Data.Length);
+                        var zlib = new Zlib();
+                        using (var dataStream = new MemoryStream(file.Data))
+                        using (var deflateStream = zlib.CompressStream(writer.BaseStream, System.IO.Compression.CompressionLevel.Optimal))
+                        {
+                            dataStream.CopyTo(deflateStream);
+                        }
+                        size = (uint)(writer.BaseStream.Position - beginOffset);
+                    }
+                    else
+                    {
+                        //write normal
+                        writer.Write(file.Data);
+                        size = (uint)file.Data.Length;
+                    }
+
+                    if (file.IsCompressFlagSet)
+                    {
+                        size |= BethesdaFile.FlagCompress;
+                    }
+
+                    fileDataSizes.Add(file, size);
+                }
+            }
+
+            var files = fileRecordOffsets
+                .Zip(fileDataOffsets, (a, b) => new { file = a.Key, fileRecordOffset = a.Value, offsetValue = b.Value })
+                .Zip(fileDataSizes, (a, b) => new { a.file, a.fileRecordOffset, a.offsetValue, size = b.Value });
+            using (var acc = mmf.CreateViewAccessor())
+            {
+                foreach (var file in files)
+                {
+                    acc.Write(file.fileRecordOffset + sizeof(ulong), file.size);
+                    acc.Write(file.fileRecordOffset + Bsa.SizeRecordOffset, file.offsetValue);
                 }
             }
         }
-
-        private KeyValuePair<uint, uint> WriteFileBlock(BinaryWriter writer, BethesdaFile file, bool defaultCompress, bool bstringPrefixed)
-        {
-            var fileDataOffset = (uint)writer.BaseStream.Position;
-            uint size;
-
-            if (bstringPrefixed)
-            {
-                writer.WriteBString(file.Filename);
-            }
-            if (file.IsCompressFlagSet ^ defaultCompress)
-            {
-                //write compressed
-                writer.Write((uint)file.Data.Length);
-                var zlib = new Zlib();
-                using (var dataStream = new MemoryStream(file.Data))
-                using (var deflateStream = zlib.CompressStream(writer.BaseStream, System.IO.Compression.CompressionLevel.Optimal))
-                {
-                    dataStream.CopyTo(deflateStream);
-                    //set size = compressed size + sizeof(originalSize field)
-                    size = (uint)writer.BaseStream.Position + sizeof(uint);
-                }
-            }
-            else
-            {
-                //write normal
-                writer.Write(file.Data);
-                size = (uint)file.Data.Length;
-            }
-
-            return new KeyValuePair<uint, uint>(fileDataOffset, size);
-        }
-
-        private long WriteFolderRecord(BinaryWriter writer, BsaFolder folder)
-        {
-            var ret = writer.BaseStream.Position;
-            folder.Record.Write(writer);
-            return ret;
-        }
-
-        private List<long> WriteFileRecordBlock(BinaryWriter writer, BsaFolder folder, bool namedDirectories, bool defaultCompress, uint totalFileNameLength, out long folderFilesOffset)
-        {
-            folderFilesOffset = writer.BaseStream.Position + totalFileNameLength;
-            if (namedDirectories)
-            {
-                writer.WriteBZString(folder.Path);
-            }
-
-            var fileOffsets = new List<long>(folder.Count);
-            foreach (var file in folder)
-            {
-                fileOffsets.Add(writer.BaseStream.Position);
-                var fileRecord = new FileRecord
-                {
-                    hash = file.Hash
-                };
-                fileRecord.Write(writer);
-            }
-
-            return fileOffsets;
-        }
+#endif
 
         public static FileFlags CreateFileFlags(IEnumerable<string> allFiles)
         {

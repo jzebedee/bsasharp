@@ -1,13 +1,30 @@
 ﻿using System;
 using System.IO;
-using System.IO.MemoryMappedFiles;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace BSAsharp.Extensions
 {
     public static class BinaryExtensions
     {
+        public static byte[] GetBytes<T>(T obj) where T : struct
+        {
+            byte[] buffer = new byte[Marshal.SizeOf(obj)];
+            GCHandle? handle = null;
+            try
+            {
+                handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+                Marshal.StructureToPtr(obj, handle.Value.AddrOfPinnedObject(), false);
+
+                return buffer;
+            }
+            finally
+            {
+                handle?.Free();
+            }
+        }
+
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();

@@ -103,18 +103,6 @@ namespace BSAsharp.Extensions
             writer.Write(bytes);
         }
 
-        public static byte[] TrimBuffer(this byte[] buf, int offset, int length = -1)
-        {
-            length = length < 0 ? buf.Length - offset : length;
-            if (offset == 0 && length == buf.Length)
-                return buf;
-
-            var newBuf = new byte[length];
-            Buffer.BlockCopy(buf, offset, newBuf, 0, length);
-
-            return newBuf;
-        }
-
         public static string TrimStart(this string str, string toTrim)
         {
             if (str.Length >= toTrim.Length && str.IndexOf(toTrim, 0, toTrim.Length, StringComparison.Ordinal) == 0)

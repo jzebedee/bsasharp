@@ -34,7 +34,7 @@ namespace BSAsharp
         //hash MUST be immutable due to undefined behavior when the sort changes in a SortedSet<T>
         public ulong Hash { get; }
 
-        internal BethesdaFile(string path, string name, FileRecord record, MemoryMappedViewStream dataStream, ArchiveFlags flags) : this(path, name)
+        internal BethesdaFile(string path, string name, FileRecord record, Stream dataStream, ArchiveFlags flags) : this(path, name)
         {
             var reader = new BinaryReader(dataStream);
 

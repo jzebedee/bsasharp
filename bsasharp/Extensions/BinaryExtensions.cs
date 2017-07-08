@@ -25,6 +25,45 @@ namespace BSAsharp.Extensions
             }
         }
 
+        public static T Read<T>(this BinaryReader reader)
+        {
+            var buffer = new byte[Marshal.SizeOf<T>()];
+            if (reader.Read(buffer, 0, buffer.Length) != buffer.Length)
+                throw new InvalidOperationException("Bytes read did not match structure size");
+
+            GCHandle? handle = null;
+            try
+            {
+                handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+                return Marshal.PtrToStructure<T>(handle.Value.AddrOfPinnedObject());
+            }
+            finally
+            {
+                handle?.Free();
+            }
+        }
+
+        public static T[] ReadArray<T>(this BinaryReader reader, int count)
+        {
+            var buffer = new byte[Marshal.SizeOf<T>() * count];
+            if (reader.Read(buffer, 0, buffer.Length) != buffer.Length)
+                throw new InvalidOperationException("Bytes read did not match structure size");
+
+            var structArray = new T[count];
+
+            GCHandle? handle = null;
+            try
+            {
+                handle = GCHandle.Alloc(structArray, GCHandleType.Pinned);
+                Marshal.Copy(buffer, 0, handle.Value.AddrOfPinnedObject(), buffer.Length);
+                return structArray;
+            }
+            finally
+            {
+                handle?.Free();
+            }
+        }
+
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();

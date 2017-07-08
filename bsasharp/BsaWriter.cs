@@ -190,7 +190,7 @@ namespace bsasharp
             var allFiles = _bsa.SelectMany(fold => fold).ToList();
             var allFileNames = allFiles.Select(file => file.Name).ToList();
 
-            header.Field = Bsa.BsaGreet;
+            header.Field = Bsa.BsaMagic;
             header.Version = Bsa.FalloutVersion;
             header.Offset = (uint)Marshal.SizeOf(typeof(BsaHeader));
             header.FolderCount = (uint)_bsa.Count;
@@ -257,7 +257,7 @@ namespace bsasharp
                 offset = (uint)writer.BaseStream.Position;
 
                 var folders = folderRecordOffsets
-                    .Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + Bsa.SizeRecordOffset, offsetValue = b.Value });
+                    .Zip(folderFileBlockOffsets, (a, b) => new { folderRecordOffset = (uint)a.Value + sizeof(ulong) + sizeof(uint), offsetValue = b.Value });
                 foreach (var folder in folders)
                 {
                     writer.BaseStream.Seek(folder.folderRecordOffset, SeekOrigin.Begin);
@@ -267,7 +267,7 @@ namespace bsasharp
                 var bstringPrefixed = header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
 
                 writer.BaseStream.Seek(offset, SeekOrigin.Begin);
-                foreach (var file in allFiles)
+                foreach (var file in _bsa.SelectMany(folder => folder))
                 {
                     var fileDataOffset = (uint)writer.BaseStream.Position;
                     fileDataOffsets.Add(file, fileDataOffset);

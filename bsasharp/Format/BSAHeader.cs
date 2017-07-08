@@ -1,7 +1,8 @@
-﻿using System.IO;
+﻿using System.Runtime.InteropServices;
 
 namespace BSAsharp.Format
 {
+    [StructLayout(LayoutKind.Sequential)]
     public struct BsaHeader
     {
         public uint Field;

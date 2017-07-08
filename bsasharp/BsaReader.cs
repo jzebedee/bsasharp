@@ -5,6 +5,9 @@ using System.Linq;
 using BSAsharp.Format;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.IO;
+using BSAsharp.Extensions;
+using System.Diagnostics;
 
 namespace BSAsharp
 {
@@ -17,47 +20,69 @@ namespace BSAsharp
             protected set { _header = value; }
         }
 
-        private readonly MemoryMappedFile _mmf;
+        private readonly Stream _stream;
 
         public BsaReader(MemoryMappedFile mmf)
         {
-            _mmf = mmf;
+            _stream = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
         }
-        ~BsaReader()
-        {
-            Dispose(false);
-        }
+        //~BsaReader()
+        //{
+        //    Dispose(false);
+        //}
 
         protected virtual void Dispose(bool disposing)
         {
             if (disposing)
             {
-                if (_mmf != null)
-                    _mmf.Dispose();
+                _stream?.Dispose();
             }
         }
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
+            //GC.SuppressFinalize(this);
         }
 
         public IEnumerable<BsaFolder> Read()
         {
-            using(var headerStream = _mmf.CreateViewAccessor(0, Marshal.SizeOf(typeof(BsaHeader)), MemoryMappedFileAccess.Read))
-                headerStream.Read(0, out _header);
+            return Read(_stream);
+        }
 
-            if (Header.Version != Bsa.FalloutVersion)
-                throw new NotImplementedException("Unsupported BSA version");
+        protected IEnumerable<BsaFolder> Read(Stream stream)
+        {
+            using (var reader = new BinaryReader(stream, Encoding.Default, true))
+            {
+                _header = reader.Read<BsaHeader>();
 
-            //BStringPrefixed = Header.ArchiveFlags.HasFlag(ArchiveFlags.BStringPrefixed);
-            //DefaultCompressed = Header.ArchiveFlags.HasFlag(ArchiveFlags.Compressed);
+                if (Header.Version != Bsa.FalloutVersion)
+                    throw new NotImplementedException("Unsupported BSA version");
 
-            long offset = Header.Offset;
-            var folderDict = ReadFolders(ref offset, Header.FolderCount);
-            var fileNames = ReadFileNameBlocks(offset, Header.FileCount);
+                long offset = Header.Offset;
+                var folderDict = ReadFolders(reader, ref offset, Header.FolderCount, Header.ArchiveFlags);
+                var fileNames = ReadFileNameBlocks(reader, offset, Header.FileCount);
 
-            return BuildBsaLayout(folderDict, fileNames);
+                return BuildBsaLayout(folderDict, fileNames);
+            }
+        }
+
+        protected Stream GetBoundedStream(uint offset, uint length)
+        {
+            long startPosition = _stream.Position;
+
+            var buffer = new byte[length];
+            try
+            {
+                _stream.Seek(offset, SeekOrigin.Begin);
+                if (_stream.Read(buffer, 0, buffer.Length) != buffer.Length)
+                    throw new InvalidOperationException("Buffer read did not match provided length for bounded stream");
+            }
+            finally
+            {
+                _stream.Seek(startPosition, SeekOrigin.Begin);
+            }
+
+            return new MemoryStream(buffer);
         }
 
         protected IEnumerable<BsaFolder> BuildBsaLayout(Dictionary<string, IList<FileRecord>> folderDict, IList<string> fileNames)
@@ -68,99 +93,103 @@ namespace BSAsharp
 
             var fileLookup = pathedFiles.ToLookup(a => a.path, a => new { a.filename, a.record });
             return
-                from g in fileLookup
-                let bsaFiles = g.Select(a => new BethesdaFile(g.Key, a.filename, a.record, _mmf.CreateViewStream(a.record.offset, a.record.size, MemoryMappedFileAccess.Read), Header.ArchiveFlags))
-                select new BsaFolder(g.Key, bsaFiles);
+                from files in fileLookup
+                let bsaFiles =
+                    from file in files
+                    let dataLen = CalculateDataSize(files.Key, file.filename, file.record, Header.ArchiveFlags)
+                    select new BethesdaFile(files.Key, file.filename, file.record, GetBoundedStream(file.record.offset, dataLen), Header.ArchiveFlags)
+                select new BsaFolder(files.Key, bsaFiles);
         }
 
-        protected Dictionary<string, IList<FileRecord>> ReadFolders(ref long offset, uint folderCount)
+        private uint CalculateDataSize(string path, string name, FileRecord record, ArchiveFlags flags)
+        {
+            name = name.ToLowerInvariant();
+            path = Util.FixPath(path);
+            var filename = Path.Combine(path, name);
+
+            uint ret = 0;
+
+            var bstringPrefixed = flags.HasFlag(ArchiveFlags.BStringPrefixed);
+            if (bstringPrefixed)
+            {
+                ret += (uint)filename.Length + sizeof(byte); //length byte
+            }
+
+            var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
+            var isCompressFlagSet = (record.size & BethesdaFile.FlagCompress) != 0;
+            var isCompressed = defaultCompressed ? !isCompressFlagSet : isCompressFlagSet;
+            if (isCompressed)
+            {
+                ret += record.size & ~BethesdaFile.FlagCompress;
+            }
+            else
+            {
+                ret += record.size;
+            }
+
+            return ret;
+        }
+
+        protected Dictionary<string, IList<FileRecord>> ReadFolders(BinaryReader reader, ref long offset, uint folderCount, ArchiveFlags flags)
         {
             var folderDict = new Dictionary<string, IList<FileRecord>>();
 
-            var folders = ReadFolderRecords(ref offset, folderCount);
+            var namedDirectories = flags.HasFlag(ArchiveFlags.NamedDirectories);
+
+            var folders = ReadFolderRecords(reader, ref offset, folderCount);
             foreach (var folder in folders)
             {
                 if (offset != folder.offset - Header.TotalFileNameLength)
                     throw new InvalidOperationException("Running offset did not match expected folder offset");
 
-                var fileRecords = ReadFileRecordBlocks(ref offset, folder.count, out string folderName);
+                var fileRecords = ReadFileRecordBlocks(reader, ref offset, folder.count, namedDirectories, out string folderName);
                 folderDict.Add(folderName, fileRecords);
             }
 
             return folderDict;
         }
 
-        protected FolderRecord[] ReadFolderRecords(ref long offset, uint folderCount)
+        protected FolderRecord[] ReadFolderRecords(BinaryReader reader, ref long offset, uint folderCount)
         {
-            var folders = new FolderRecord[folderCount];
-            var folderRecordsSize = folderCount * Marshal.SizeOf(typeof(FolderRecord));
-
-            using (var folderRecordView = _mmf.CreateViewAccessor(offset, folderRecordsSize, MemoryMappedFileAccess.Read))
-            {
-                var foldersRead = folderRecordView.ReadArray(0, folders, 0, (int)folderCount);
-                if (foldersRead != folderCount)
-                    throw new InvalidOperationException("Folder records read did not match folder record count");
-
-                offset += folderRecordsSize;
-                return folders;
-            }
+            offset += folderCount * Marshal.SizeOf(typeof(FolderRecord));
+            return reader.ReadArray<FolderRecord>((int)folderCount);
         }
 
-        protected FileRecord[] ReadFileRecords(ref long offset, uint fileCount)
+        protected FileRecord[] ReadFileRecords(BinaryReader reader, ref long offset, uint fileCount)
         {
-            var files = new FileRecord[fileCount];
-            var fileRecordsSize = fileCount * Marshal.SizeOf(typeof(FileRecord));
-
-            using (var fileRecordView = _mmf.CreateViewAccessor(offset, fileRecordsSize, MemoryMappedFileAccess.Read))
-            {
-                var filesRead = fileRecordView.ReadArray(0, files, 0, (int)fileCount);
-                if (filesRead != fileCount)
-                    throw new InvalidOperationException("File records read did not match file record count");
-
-                offset += fileRecordsSize;
-                return files;
-            }
+            offset += fileCount * Marshal.SizeOf(typeof(FileRecord));
+            return reader.ReadArray<FileRecord>((int)fileCount);
         }
 
-        protected FileRecord[] ReadFileRecordBlocks(ref long offset, uint fileCount, out string folderName)
+        protected FileRecord[] ReadFileRecordBlocks(BinaryReader reader, ref long offset, uint fileCount, bool namedDirectories, out string folderName)
         {
-            using (var fileRecordBlockView = _mmf.CreateViewAccessor(offset, 0, MemoryMappedFileAccess.Read))
+            if (namedDirectories)
             {
-                var bstringLen = fileRecordBlockView.ReadByte(0);
-
-                var folderNameBytes = new byte[bstringLen];
-                var bytesRead = fileRecordBlockView.ReadArray(sizeof(byte), folderNameBytes, 0, bstringLen);
-                if (bytesRead != bstringLen)
-                    throw new InvalidOperationException("Folder name read did not match length prefix");
-
-                offset += sizeof(byte) + bstringLen;
-                //trim trailing null
-                folderName = Encoding.Default.GetString(folderNameBytes, 0, folderNameBytes.Length - 1);
+                var startPos = reader.BaseStream.Position;
+                folderName = reader.ReadBString(true);
+                var endPos = reader.BaseStream.Position;
+                offset += (endPos - startPos);
+            }
+            else
+            {
+                folderName = null;
             }
 
-            return ReadFileRecords(ref offset, fileCount);
+            return ReadFileRecords(reader, ref offset, fileCount);
         }
 
-        protected string[] ReadFileNameBlocks(long offset, uint count)
+        protected string[] ReadFileNameBlocks(BinaryReader reader, long offset, uint count)
         {
+            var fileNamesBytes = reader.ReadBytes((int)Header.TotalFileNameLength);
+            offset += Header.TotalFileNameLength;
+
             var fileNames = new string[(int)count];
-
-            var fileNamesBytes = new byte[Header.TotalFileNameLength];
-            using(var fileNamesView = _mmf.CreateViewAccessor(offset, Header.TotalFileNameLength, MemoryMappedFileAccess.Read))
-            {
-                var bytesRead = fileNamesView.ReadArray(0, fileNamesBytes, 0, fileNamesBytes.Length);
-                if (bytesRead != Header.TotalFileNameLength)
-                    throw new InvalidOperationException("File names read did not match total file name length");
-
-                offset += bytesRead;
-            }
-
             for (int i = 0, j = 0, last = 0; i < fileNamesBytes.Length && j < fileNames.Length; i++)
             {
-                if(fileNamesBytes[i] == '\0')
+                if (fileNamesBytes[i] == '\0')
                 {
-                    fileNames[j++] = Encoding.Default.GetString(fileNamesBytes, last, i-last);
-                    last = i+1;
+                    fileNames[j++] = Encoding.Default.GetString(fileNamesBytes, last, i - last);
+                    last = i + 1;
                 }
             }
 

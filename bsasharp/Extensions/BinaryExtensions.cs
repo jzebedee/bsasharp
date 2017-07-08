@@ -47,7 +47,7 @@ namespace BSAsharp.Extensions
         {
             var buffer = new byte[Marshal.SizeOf<T>() * count];
             if (reader.Read(buffer, 0, buffer.Length) != buffer.Length)
-                throw new InvalidOperationException("Bytes read did not match structure size");
+                throw new InvalidOperationException("Bytes read did not match expected size of structure array");
 
             var structArray = new T[count];
 

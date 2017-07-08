@@ -14,8 +14,7 @@ namespace BSAsharp
     {
         internal const int
             FalloutVersion = 0x68,
-            SizeRecordOffset = 0xC, //SIZE_RECORD - sizeof(uint)
-            BsaGreet = 0x415342; //'B','S','A','\0'
+            BsaMagic = 0x415342; //'B','S','A','\0'
         internal const uint BsaMaxSize = 0x80000000; //2 GiB
 
         private readonly BsaReader _bsaReader;

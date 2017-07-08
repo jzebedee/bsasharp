@@ -28,11 +28,7 @@ namespace BSAsharp.Extensions
         public static string ReadBString(this BinaryReader reader, bool stripEnd = false)
         {
             var length = reader.ReadByte();
-            return ReadBString(reader, length, stripEnd);
-        }
 
-        public static string ReadBString(this BinaryReader reader, byte length, bool stripEnd = false)
-        {
             var bytes = reader.ReadBytes(length);
             var bstring = Encoding.Default.GetString(bytes);
 

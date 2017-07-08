@@ -3,7 +3,7 @@ using System.IO;
 using System.Diagnostics;
 using BSAsharp.Format;
 using BSAsharp.Extensions;
-using System.IO.MemoryMappedFiles;
+using BSAsharp.Compression;
 
 namespace BSAsharp
 {
@@ -14,6 +14,35 @@ namespace BSAsharp
     public class BethesdaFile : IBsaEntry
     {
         internal const uint FlagCompress = 1 << 30;
+        
+        internal static uint CalculateDataSize(string path, string name, uint size, ArchiveFlags flags)
+        {
+            name = name.ToLowerInvariant();
+            path = Util.FixPath(path);
+            var filename = System.IO.Path.Combine(path, name);
+
+            uint ret = 0;
+
+            var bstringPrefixed = flags.HasFlag(ArchiveFlags.BStringPrefixed);
+            if (bstringPrefixed)
+            {
+                ret += (uint)filename.Length + sizeof(byte); //length byte
+            }
+
+            var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
+            var isCompressFlagSet = (size & FlagCompress) != 0;
+            var isCompressed = defaultCompressed ? !isCompressFlagSet : isCompressFlagSet;
+            if (isCompressed)
+            {
+                ret += size & ~FlagCompress;
+            }
+            else
+            {
+                ret += size;
+            }
+
+            return ret;
+        }
 
         public string Name { get; private set; }
         public string Filename { get; private set; }

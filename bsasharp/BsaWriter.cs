@@ -1,4 +1,5 @@
 ﻿using BSAsharp;
+using BSAsharp.Compression;
 using BSAsharp.Extensions;
 using BSAsharp.Format;
 using System;
@@ -269,10 +270,10 @@ namespace bsasharp
                 writer.BaseStream.Seek(offset, SeekOrigin.Begin);
                 foreach (var file in _bsa.SelectMany(folder => folder))
                 {
+                    uint dataSize = 0;
+
                     var fileDataOffset = (uint)writer.BaseStream.Position;
                     fileDataOffsets.Add(file, fileDataOffset);
-
-                    uint size;
 
                     if (bstringPrefixed)
                     {
@@ -280,24 +281,28 @@ namespace bsasharp
                     }
                     if (file.IsCompressFlagSet ^ defaultCompress)
                     {
-                        var beginOffset = (uint)writer.BaseStream.Position;
                         //write compressed
                         writer.Write((uint)file.Data.Length);
                         var zlib = new Zlib();
                         using (var dataStream = new MemoryStream(file.Data))
-                        using (var deflateStream = zlib.CompressStream(writer.BaseStream, System.IO.Compression.CompressionLevel.Optimal))
+                        using (var compressedDataStream = new MemoryStream())
                         {
-                            dataStream.CopyTo(deflateStream);
+                            using (var deflateStream = zlib.CompressStream(compressedDataStream, System.IO.Compression.CompressionLevel.Optimal))
+                            {
+                                dataStream.CopyTo(deflateStream);
+                            }
+                            compressedDataStream.WriteTo(writer.BaseStream);
+                            dataSize = (uint)compressedDataStream.Length;
                         }
-                        size = (uint)(writer.BaseStream.Position - beginOffset);
                     }
                     else
                     {
                         //write normal
                         writer.Write(file.Data);
-                        size = (uint)file.Data.Length;
+                        dataSize = (uint)file.Data.Length;
                     }
 
+                    var size = BethesdaFile.CalculateDataSize(file.Path, file.Name, dataSize, header.ArchiveFlags);
                     if (file.IsCompressFlagSet)
                     {
                         size |= BethesdaFile.FlagCompress;

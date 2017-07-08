@@ -96,38 +96,9 @@ namespace BSAsharp
                 from files in fileLookup
                 let bsaFiles =
                     from file in files
-                    let dataLen = CalculateDataSize(files.Key, file.filename, file.record, Header.ArchiveFlags)
+                    let dataLen = BethesdaFile.CalculateDataSize(files.Key, file.filename, file.record.size, Header.ArchiveFlags)
                     select new BethesdaFile(files.Key, file.filename, file.record, GetBoundedStream(file.record.offset, dataLen), Header.ArchiveFlags)
                 select new BsaFolder(files.Key, bsaFiles);
-        }
-
-        private uint CalculateDataSize(string path, string name, FileRecord record, ArchiveFlags flags)
-        {
-            name = name.ToLowerInvariant();
-            path = Util.FixPath(path);
-            var filename = Path.Combine(path, name);
-
-            uint ret = 0;
-
-            var bstringPrefixed = flags.HasFlag(ArchiveFlags.BStringPrefixed);
-            if (bstringPrefixed)
-            {
-                ret += (uint)filename.Length + sizeof(byte); //length byte
-            }
-
-            var defaultCompressed = flags.HasFlag(ArchiveFlags.DefaultCompressed);
-            var isCompressFlagSet = (record.size & BethesdaFile.FlagCompress) != 0;
-            var isCompressed = defaultCompressed ? !isCompressFlagSet : isCompressFlagSet;
-            if (isCompressed)
-            {
-                ret += record.size & ~BethesdaFile.FlagCompress;
-            }
-            else
-            {
-                ret += record.size;
-            }
-
-            return ret;
         }
 
         protected Dictionary<string, IList<FileRecord>> ReadFolders(BinaryReader reader, ref long offset, uint folderCount, ArchiveFlags flags)
